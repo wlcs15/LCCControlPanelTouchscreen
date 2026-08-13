@@ -127,7 +127,8 @@ STALE   ──(EventReport/ProducerIdentified)──→ NORMAL or REVERSE
 
 OpenMRN requires ESP-IDF 5.1.6 (GCC 12.2.0) due to newlib/libstdc++ incompatibility 
 in GCC 13.x/14.x. The component CMakeLists.txt excludes `EspIdfWiFi.cxx` (uses 
-ESP-IDF 5.3+ APIs) since this project uses CAN, not WiFi.
+ESP-IDF 5.3+ APIs). House-AP join is the local wrap/STA module; CAN/TWAI remains 
+the LCC bus.
 
 Key compile options:
 - C++ Standard: C++14

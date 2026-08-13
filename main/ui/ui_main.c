@@ -8,6 +8,7 @@
  */
 
 #include "ui_common.h"
+#include "ui_wifi_icon.h"
 #include "esp_log.h"
 #include <string.h>
 
@@ -97,6 +98,8 @@ static void ui_create_settings_screen(void)
     lv_obj_set_style_text_font(back_label, &lv_font_montserrat_16, LV_PART_MAIN);
     lv_obj_set_style_text_color(back_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
     lv_obj_center(back_label);
+
+    ui_wifi_icon_attach(scr, 800 - 36 - 8, 8);
 
     ESP_LOGI(TAG, "Settings screen created");
     ui_unlock();

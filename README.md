@@ -94,6 +94,27 @@ idf.py build
 idf.py -p COMx flash monitor
 ```
 
+Or with the pinned 5.1.6 helper (no password on the command line):
+
+```bash
+./utils/build_idf5.sh build
+./utils/build_idf5.sh -p /dev/ttyACM0 flash
+```
+
+### Wi-Fi STA (optional second path; CAN stays the LCC bus)
+
+The firmware joins the house AP using the same host wrap as the D1 R32 tree: AES-256-GCM ciphertext bound to this chip’s flash UID, MAC, and OpenLCB node ID. The PSK is never a git default and is never compiled in as plaintext.
+
+```bash
+# After a wrap-free flash, collect IDs from serial (USB Serial/JTAG is usually ttyACM0)
+./utils/collect_hw_ids.py --port /dev/ttyACM0
+
+# In YOUR interactive terminal only:
+./utils/provision_wifi_build.sh -p /dev/ttyACM0 flash
+```
+
+A wrap-free boot logs `WiFi password: NOT SET` and shows a dim dot. After provision: search (yellow low bar), then three green bars or the slashed fail icon. Changing `nodeid.txt` after provision breaks unwrap — collect IDs again.
+
 ### VS Code with ESP-IDF Extension
 
 This project is configured for the [ESP-IDF VS Code Extension](https://marketplace.visualstudio.com/items?itemName=espressif.esp-idf-extension):

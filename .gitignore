@@ -82,3 +82,8 @@ Firmware/
 
 # Local SD-card backups from the bench (never index or push)
 sdcard-backups/
+
+# Wi-Fi wrap (ciphertext) and board IDs — never commit
+wifi_secrets.env
+local/
+main/wifi/wifi_psk_wrap.inc

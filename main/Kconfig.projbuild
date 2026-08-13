@@ -131,4 +131,20 @@ menu "LCC Turnout Panel Configuration"
                 Minimum interval between LCC events in milliseconds.
     endmenu
 
+    menu "Wi-Fi STA"
+        config WIFI_STA_ENABLED
+            bool "Start Wi-Fi STA after unwrap"
+            default y
+            help
+                Join the house AP using the host-wrapped PSK. CAN/TWAI stays
+                the LCC bus. Do not store the password here.
+
+        config WIFI_STA_SSID
+            string "Wi-Fi SSID (not secret; PSK is not stored here)"
+            default "SRIF2333"
+            help
+                Public SSID default for the provision script prompt only.
+                The compiled firmware reads SSID from the wrap/NVS blob.
+    endmenu
+
 endmenu

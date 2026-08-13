@@ -14,6 +14,7 @@
 #include "app/turnout_manager.h"
 #include "app/lcc_node.h"
 #include "app/panel_storage.h"
+#include "ui_wifi_icon.h"
 #include "esp_log.h"
 #include <string.h>
 
@@ -443,6 +444,9 @@ void ui_create_panel_screen(void)
     lv_obj_set_style_text_color(gear_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
     lv_obj_center(gear_label);
 
+    // Wi-Fi status to the left of the gear (36x28).
+    ui_wifi_icon_attach(scr, PANEL_CANVAS_WIDTH - 40 - 8 - 36 - 6, 8);
+
     // --- Empty state ---
     s_empty_label = lv_label_create(s_canvas);
     lv_label_set_text(s_empty_label, "No layout configured");
@@ -496,6 +500,7 @@ void ui_panel_update_turnout(int index, turnout_state_t state)
 
 void ui_panel_invalidate(void)
 {
+    ui_wifi_icon_invalidate();
     s_canvas = NULL;
     s_panel_screen = NULL;
     s_empty_label = NULL;

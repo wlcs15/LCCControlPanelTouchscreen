@@ -15,6 +15,13 @@
 #include "esp_check.h"
 #include "nvs_flash.h"
 #include "driver/i2c.h"
+#include "esp_event.h"
+#include "esp_netif.h"
+
+#include "wifi_cred.h"
+#include "wifi_ids.h"
+#include "wifi_sta.h"
+#include "ui_wifi_icon.h"
 
 // Board drivers
 #include "ch422g.h"
@@ -242,6 +249,50 @@ static void check_and_run_bootloader(void)
     esp_restart();  /* should never reach here */
 }
 
+#if CONFIG_WIFI_STA_ENABLED
+static void wifi_icon_async(void *param)
+{
+    ui_wifi_icon_set_state((wifi_sta_state_t)(uintptr_t)param);
+}
+
+static void wifi_sta_ui_cb(wifi_sta_state_t st, void *ctx)
+{
+    (void)ctx;
+    lv_async_call(wifi_icon_async, (void *)(uintptr_t)st);
+}
+
+static void start_wifi_sta(void)
+{
+    uint64_t node = lcc_node_get_node_id();
+    if (node == 0) {
+        node = LCC_DEFAULT_NODE_ID;
+    }
+    wifi_cred_set_node_id(node);
+
+    esp_err_t nerr = esp_netif_init();
+    if (nerr != ESP_OK && nerr != ESP_ERR_INVALID_STATE) {
+        ESP_LOGE(TAG, "esp_netif_init failed: %s", esp_err_to_name(nerr));
+        return;
+    }
+    nerr = esp_event_loop_create_default();
+    if (nerr != ESP_OK && nerr != ESP_ERR_INVALID_STATE) {
+        ESP_LOGE(TAG, "event loop create failed: %s", esp_err_to_name(nerr));
+        return;
+    }
+
+    wifi_ids_log();
+
+    char ssid[33] = {0};
+    char psk[65] = {0};
+    esp_err_t err = wifi_cred_load(ssid, sizeof(ssid), psk, sizeof(psk));
+    wifi_ids_log_psk_status(err);
+    if (err == ESP_OK) {
+        (void)wifi_sta_start(ssid, psk);
+    }
+    memset(psk, 0, sizeof(psk));
+}
+#endif
+
 /**
  * @brief Application entry point
  */
@@ -310,6 +361,11 @@ void app_main(void)
         register_all_turnout_events();
     }
 
+#if CONFIG_WIFI_STA_ENABLED
+    /* STA only — CAN remains the LCC bus. Does not wait for an IP. */
+    start_wifi_sta();
+#endif
+
     /* ---- Screen timeout (power saving) ---- */
     screen_timeout_config_t st_cfg = {
         .ch422g_handle = s_ch422g,
@@ -327,6 +383,10 @@ void app_main(void)
     }
 
     ui_show_main();
+
+#if CONFIG_WIFI_STA_ENABLED
+    wifi_sta_set_status_cb(wifi_sta_ui_cb, NULL);
+#endif
 
     if (lcc_node_get_status() == LCC_STATUS_RUNNING) {
         lcc_node_query_all_turnout_states();
@@ -354,11 +414,21 @@ void app_main(void)
         /* Heartbeat status log every 30 s */
         if ((xTaskGetTickCount() - last_status) >= pdMS_TO_TICKS(30000)) {
             last_status = xTaskGetTickCount();
+#if CONFIG_WIFI_STA_ENABLED
+            ESP_LOGI(TAG, "heap=%lu LCC=%s screen=%s turnouts=%d wifi=%s ip=%s",
+                     esp_get_free_heap_size(),
+                     lcc_node_get_status() == LCC_STATUS_RUNNING ? "ok" : "off",
+                     screen_timeout_is_screen_on() ? "on" : "off",
+                     (int)turnout_manager_get_count(),
+                     wifi_sta_state_name(wifi_sta_state()),
+                     wifi_sta_ip()[0] ? wifi_sta_ip() : "-");
+#else
             ESP_LOGI(TAG, "heap=%lu LCC=%s screen=%s turnouts=%d",
                      esp_get_free_heap_size(),
                      lcc_node_get_status() == LCC_STATUS_RUNNING ? "ok" : "off",
                      screen_timeout_is_screen_on() ? "on" : "off",
                      (int)turnout_manager_get_count());
+#endif
         }
     }
 }

@@ -1,0 +1,6 @@
+I (287) main: LCC Turnout Control Panel starting
+I (317) debug_ids: ==== DEBUG IDs (not the WiFi PSK) ====
+I (327) debug_ids: MAC Address: DE:AD:BE:EF:00:01
+I (337) debug_ids: OpenLCB Node ID: 05.01.01.01.A5.31
+I (347) debug_ids: SPI flash unique ID: 0123456789ABCDEF
+W (357) wifi_cred: No NVS wrap yet. Collect IDs, then run utils/provision_wifi_build.sh in your terminal.

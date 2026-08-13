@@ -54,7 +54,8 @@ These must be converted to proper C `#include` wrapper files. Example:
 
 **WiFi Driver Exclusion**: `EspIdfWiFi.cxx` uses ESP-IDF 5.3+ APIs (`channel_bitmap`, 
 `WIFI_EVENT_HOME_CHANNEL_CHANGE`) and must be excluded from the build in 
-`components/OpenMRN/CMakeLists.txt` when using ESP-IDF 5.1.6.
+`components/OpenMRN/CMakeLists.txt` when using ESP-IDF 5.1.6. STA join uses 
+`main/wifi/` (host wrap + `esp_wifi`) instead.
 
 **FAT Long Filename Support**: `turnouts.json` requires FAT LFN support. Enable in 
 `sdkconfig`:
