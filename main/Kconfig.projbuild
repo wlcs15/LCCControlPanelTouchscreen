@@ -21,11 +21,13 @@ menu "LCC Turnout Panel Configuration"
 
         config LCD_RGB_BOUNCE_BUFFER_HEIGHT
             int "RGB Bounce Buffer Height"
-            default 480
+            default 10
             help
                 Height of the bounce buffer in pixels. Width matches LCD.
-                Use full screen height (480) for smooth animations without
-                horizontal banding during tab transitions.
+                ESP-IDF 5.1 requires frame_size % (2 * bounce_size) == 0, so
+                for 480-line panels this height must divide 240 (e.g. 10, 20,
+                40, 60, 80, 120). Full height (480) is invalid and fails panel
+                create. Larger values use more internal SRAM (two bounce buffers).
     endmenu
 
     menu "LVGL Settings"
