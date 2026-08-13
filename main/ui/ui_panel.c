@@ -429,13 +429,16 @@ void ui_create_panel_screen(void)
     lv_obj_set_style_bg_opa(s_canvas, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_clear_flag(s_canvas, LV_OBJ_FLAG_SCROLLABLE);
 
-    // --- Floating settings gear button (upper-right corner) ---
-    lv_obj_t *settings_btn = lv_btn_create(scr);
+    // --- Floating settings gear (upper-right). No button chrome. ---
+    lv_obj_t *settings_btn = lv_obj_create(scr);
+    lv_obj_remove_style_all(settings_btn);
     lv_obj_set_size(settings_btn, 40, 36);
     lv_obj_set_pos(settings_btn, PANEL_CANVAS_WIDTH - 40 - 8, 6);
-    lv_obj_set_style_bg_color(settings_btn, lv_color_hex(0x555555), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(settings_btn, LV_OPA_70, LV_PART_MAIN);
-    lv_obj_set_style_radius(settings_btn, 6, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(settings_btn, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(settings_btn, LV_OPA_20, LV_PART_MAIN | LV_STATE_PRESSED);
+    lv_obj_set_style_bg_color(settings_btn, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_PRESSED);
+    lv_obj_add_flag(settings_btn, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_clear_flag(settings_btn, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_event_cb(settings_btn, settings_btn_cb, LV_EVENT_CLICKED, NULL);
 
     lv_obj_t *gear_label = lv_label_create(settings_btn);
