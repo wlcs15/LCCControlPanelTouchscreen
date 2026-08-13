@@ -444,8 +444,13 @@ void ui_create_panel_screen(void)
     lv_obj_set_style_text_color(gear_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
     lv_obj_center(gear_label);
 
-    // Wi-Fi status to the left of the gear (36x28).
-    ui_wifi_icon_attach(scr, PANEL_CANVAS_WIDTH - 40 - 8 - 36 - 6, 8);
+    // Wi-Fi status, top row, right-justified with a gap from the gear.
+    // Gear stays at (width-48, 6); do not move it.
+    {
+        const lv_coord_t gear_x = PANEL_CANVAS_WIDTH - 40 - 8;
+        const lv_coord_t gap = 28;
+        ui_wifi_icon_attach(scr, gear_x - gap - 36, 8);
+    }
 
     // --- Empty state ---
     s_empty_label = lv_label_create(s_canvas);
