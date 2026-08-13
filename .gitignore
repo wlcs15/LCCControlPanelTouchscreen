@@ -79,3 +79,6 @@ Desktop.ini
 examples/
 Firmware/
 .vscode/settings.json
+
+# Local SD-card backups from the bench (never index or push)
+sdcard-backups/
