@@ -1,9 +1,44 @@
 #include "wifi_ids.h"
 
 #include <stdio.h>
+#include <string.h>
 
 #include "esp_log.h"
 #include "wifi_cred.h"
+
+static uint64_t parse_dotted_node(const char *s)
+{
+    unsigned b[6] = {0};
+    if (sscanf(s, "%x.%x.%x.%x.%x.%x", &b[0], &b[1], &b[2], &b[3], &b[4], &b[5]) != 6)
+    {
+        return 0;
+    }
+    return ((uint64_t)b[0] << 40) | ((uint64_t)b[1] << 32) | ((uint64_t)b[2] << 24) |
+           ((uint64_t)b[3] << 16) | ((uint64_t)b[4] << 8) | (uint64_t)b[5];
+}
+
+void wifi_ids_bind_sd_node(const char *nodeid_path)
+{
+    if (nodeid_path == NULL)
+    {
+        return;
+    }
+    FILE *f = fopen(nodeid_path, "r");
+    if (!f)
+    {
+        return;
+    }
+    char buf[64] = {0};
+    if (fgets(buf, sizeof(buf), f) != NULL)
+    {
+        const uint64_t node = parse_dotted_node(buf);
+        if (node != 0)
+        {
+            wifi_cred_set_node_id(node);
+        }
+    }
+    fclose(f);
+}
 
 static const char *TAG = "debug_ids";
 

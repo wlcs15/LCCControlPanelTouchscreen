@@ -80,6 +80,9 @@ examples/
 Firmware/
 .vscode/settings.json
 
+# Loose notes dropped in the repo root (keep tracked docs/sources)
+/*.txt
+
 # Local SD-card backups from the bench (never index or push)
 sdcard-backups/
 

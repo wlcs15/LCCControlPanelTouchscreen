@@ -34,7 +34,20 @@ def _reset_esp32(ser) -> None:
     time.sleep(0.1)
 
 
-def collect_from_port(port: str, baud: int, timeout_s: float, out_path: Path) -> dict[str, str]:
+def _open_serial(serial_mod, port: str, baud: int, wait_s: float):
+    deadline = time.time() + wait_s
+    last_err = None
+    while time.time() < deadline:
+        try:
+            return serial_mod.Serial(port, baudrate=baud, timeout=0.2)
+        except Exception as exc:  # port may vanish during USB-JTAG reset
+            last_err = exc
+            time.sleep(0.2)
+    print(f"Could not open {port}: {last_err}", file=sys.stderr)
+    raise SystemExit(1)
+
+
+def collect_from_port(port: str, baud: int, timeout_s: float, out_path: Path, no_reset: bool = False) -> dict[str, str]:
     try:
         import serial
     except ImportError:
@@ -43,11 +56,25 @@ def collect_from_port(port: str, baud: int, timeout_s: float, out_path: Path) ->
 
     chunks: list[str] = []
     deadline = time.time() + timeout_s
-    with serial.Serial(port, baudrate=baud, timeout=0.2) as ser:
-        _reset_esp32(ser)
+    ser = _open_serial(serial, port, baud, 5.0)
+    try:
+        if not no_reset:
+            try:
+                _reset_esp32(ser)
+            except Exception:
+                pass
+            ser.close()
+            time.sleep(0.8)
+            ser = _open_serial(serial, port, baud, 8.0)
         ser.reset_input_buffer()
         while time.time() < deadline:
-            raw = ser.read(1024)
+            try:
+                raw = ser.read(1024)
+            except Exception:
+                ser.close()
+                time.sleep(0.5)
+                ser = _open_serial(serial, port, baud, 8.0)
+                continue
             if raw:
                 chunks.append(raw.decode("utf-8", errors="replace"))
                 text = "".join(chunks)
@@ -57,11 +84,30 @@ def collect_from_port(port: str, baud: int, timeout_s: float, out_path: Path) ->
                     and "SPI flash unique ID:" in text
                 ):
                     break
+    finally:
+        try:
+            ser.close()
+        except Exception:
+            pass
     text = "".join(chunks)
+    raw_log = Path(out_path).parent / "last_collect.log"
+    try:
+        raw_log.parent.mkdir(parents=True, exist_ok=True)
+        raw_log.write_text(text, encoding="utf-8", errors="replace")
+    except Exception:
+        raw_log = None
     if not text.strip():
         print(f"No serial data from {port}. Is the board connected?", file=sys.stderr)
+        print("On USB-JTAG use --no-reset, then tap the board RESET while this runs.", file=sys.stderr)
         raise SystemExit(1)
-    ids = parse_debug_log(text)
+    try:
+        ids = parse_debug_log(text)
+    except SystemExit:
+        print(f"Got {len(text)} bytes but they did not contain the DEBUG ID lines.", file=sys.stderr)
+        if raw_log:
+            print(f"Raw capture: {raw_log}", file=sys.stderr)
+        print("Tap RESET once while collect is running (USB-JTAG: use --no-reset).", file=sys.stderr)
+        raise
     write_hw_ids(out_path, ids)
     return ids
 
@@ -73,13 +119,18 @@ def main() -> None:
     parser.add_argument("--timeout", type=float, default=25.0)
     parser.add_argument("--from-log", dest="from_log", help="Parse a saved log instead of opening serial")
     parser.add_argument("--out", default=DEFAULT_OUT)
+    parser.add_argument(
+        "--no-reset",
+        action="store_true",
+        help="Do not pulse RTS (required for ESP32-S3 USB-JTAG; tap the board RESET instead)",
+    )
     args = parser.parse_args()
 
     out_path = Path(args.out)
     if args.from_log:
         ids = collect_from_log(Path(args.from_log), out_path)
     elif args.port:
-        ids = collect_from_port(args.port, args.baud, args.timeout, out_path)
+        ids = collect_from_port(args.port, args.baud, args.timeout, out_path, no_reset=args.no_reset)
     else:
         parser.error("provide --port or --from-log")
 

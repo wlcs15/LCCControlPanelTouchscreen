@@ -77,6 +77,9 @@ esp_err_t ui_init(lv_disp_t **disp, lv_indev_t **touch_indev);
  */
 esp_err_t ui_splash_show_image(esp_lcd_panel_handle_t panel, const char *filepath);
 
+/** Panel / icon backdrop. Light lilac so black / green / red marks stay readable. */
+#define UI_PANEL_BG_RGB  0xEDE4F5
+
 /**
  * @brief Show SD-card-missing error screen and halt
  *

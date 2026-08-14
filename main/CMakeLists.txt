@@ -9,6 +9,7 @@ idf_component_register(
         "app/screen_timeout.c"
         "app/bootloader_hal.cpp"
         "app/bootloader_display.c"
+        "app/sd_log.c"
         "ui/ui_common.c"
         "ui/ui_main.c"
         "ui/ui_turnouts.c"
@@ -21,6 +22,7 @@ idf_component_register(
         "wifi/wifi_cred.cpp"
         "wifi/wifi_sta.cpp"
         "wifi/wifi_ids.c"
+        "wifi/svc_reach.cpp"
     INCLUDE_DIRS 
         "."
         "app"
@@ -43,6 +45,7 @@ idf_component_register(
         esp_netif
         mbedtls
         spi_flash
+        lwip
 )
 
 # Set C++ standard for OpenMRN compatibility
@@ -51,11 +54,15 @@ set_source_files_properties(
     "app/bootloader_hal.cpp"
     "wifi/wifi_cred.cpp"
     "wifi/wifi_sta.cpp"
+    "wifi/svc_reach.cpp"
     PROPERTIES COMPILE_FLAGS "-std=gnu++14 -fno-strict-aliasing"
 )
 
 # Host-encrypted wrap only (utils/provision_wifi_build.sh). Never a PSK here.
+# Re-run CMake when the wrap file appears or disappears so the next flash
+# is not a stale wrap-free .bin.
 set(_wifi_wrap_inc "${CMAKE_CURRENT_LIST_DIR}/wifi/wifi_psk_wrap.inc")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_wifi_wrap_inc}")
 if(EXISTS "${_wifi_wrap_inc}")
     target_compile_definitions(${COMPONENT_LIB} PRIVATE WIFI_WRAP_BLOB_PRESENT=1)
     set_source_files_properties(wifi/wifi_cred.cpp PROPERTIES OBJECT_DEPENDS "${_wifi_wrap_inc}")

@@ -14,6 +14,8 @@
 #include "esp_err.h"
 #include "esp_check.h"
 #include "nvs_flash.h"
+#include "esp_system.h"
+#include "esp_task_wdt.h"
 #include "driver/i2c.h"
 #include "esp_event.h"
 #include "esp_netif.h"
@@ -21,6 +23,7 @@
 #include "wifi_cred.h"
 #include "wifi_ids.h"
 #include "wifi_sta.h"
+#include "svc_reach.h"
 #include "ui_wifi_icon.h"
 
 // Board drivers
@@ -39,6 +42,7 @@
 #include "app/screen_timeout.h"
 #include "app/bootloader_hal.h"
 #include "app/panel_storage.h"
+#include "app/sd_log.h"
 
 // Reset-reason detection (bootloader check)
 #if defined(CONFIG_IDF_TARGET_ESP32S3)
@@ -103,14 +107,19 @@ static esp_err_t init_hardware(void)
         .clk_gpio   = CONFIG_SD_CLK_GPIO,
         .mount_point = CONFIG_SD_MOUNT_POINT,
         .ch422g_handle = s_ch422g,
-        .max_files = 5,
+        .max_files = 8,
         .format_if_mount_failed = false,
     };
     ret = waveshare_sd_init(&sd_cfg, &s_sd_card);
     s_sd_card_ok = (ret == ESP_OK);
     if (!s_sd_card_ok) {
         ESP_LOGW(TAG, "SD card init failed: %s", esp_err_to_name(ret));
+    } else {
+        wifi_ids_bind_sd_node("/sdcard/nodeid.txt");
+        sd_log_init();
     }
+    /* UART (CH343) dies once RGB LCD claims GPIO43/44. Log IDs first. */
+    wifi_ids_log();
 
     /* 4. RGB LCD (double-buffered with DMA bounce buffer) */
     waveshare_lcd_config_t lcd_cfg = {
@@ -236,7 +245,7 @@ static void check_and_run_bootloader(void)
             .clk_gpio   = CONFIG_SD_CLK_GPIO,
             .mount_point = CONFIG_SD_MOUNT_POINT,
             .ch422g_handle = s_ch422g,
-            .max_files = 5,
+            .max_files = 8,
             .format_if_mount_failed = false,
         };
         if (waveshare_sd_init(&sd, &s_sd_card) == ESP_OK) {
@@ -298,8 +307,16 @@ static void start_wifi_sta(void)
  */
 void app_main(void)
 {
-    ESP_LOGI(TAG, "LCC Turnout Control Panel starting  (IDF %s, heap %lu)",
-             esp_get_idf_version(), esp_get_free_heap_size());
+    const esp_reset_reason_t rr = esp_reset_reason();
+    const bool dirty_reset =
+        (rr == ESP_RST_PANIC || rr == ESP_RST_INT_WDT ||
+         rr == ESP_RST_TASK_WDT || rr == ESP_RST_WDT || rr == ESP_RST_BROWNOUT);
+
+    ESP_LOGI(TAG, "LCC Turnout Control Panel starting  (IDF %s, heap %lu, reset=%d dirty=%d)",
+             esp_get_idf_version(), esp_get_free_heap_size(), (int)rr, (int)dirty_reset);
+    if (dirty_reset) {
+        ESP_LOGW(TAG, "Previous run died (reset=%d) — skipping splash JPEG", (int)rr);
+    }
 
     /* ---- Bootloader check (must be first) ---- */
     check_and_run_bootloader();
@@ -346,8 +363,12 @@ void app_main(void)
     lcc_node_set_discovery_callback(discovery_cb);
 
     /* ---- Splash image (direct framebuffer, pre-LVGL) ---- */
-    ui_splash_show_image(s_lcd_panel, "/sdcard/SPLASH.JPG");
-    vTaskDelay(pdMS_TO_TICKS(3000));
+    if (!dirty_reset) {
+        ui_splash_show_image(s_lcd_panel, "/sdcard/SPLASH.JPG");
+        vTaskDelay(pdMS_TO_TICKS(3000));
+    } else {
+        ESP_LOGW(TAG, "safe-boot: no splash after watchdog/panic");
+    }
 
     /* ---- LCC / OpenMRN ---- */
     lcc_config_t lcc_cfg = LCC_CONFIG_DEFAULT();
@@ -386,6 +407,8 @@ void app_main(void)
 
 #if CONFIG_WIFI_STA_ENABLED
     wifi_sta_set_status_cb(wifi_sta_ui_cb, NULL);
+    /* After LVGL: probe task uses lv_async_call. */
+    svc_reach_start();
 #endif
 
     if (lcc_node_get_status() == LCC_STATUS_RUNNING) {
@@ -393,12 +416,17 @@ void app_main(void)
     }
 
     ESP_LOGI(TAG, "Init complete — entering main loop");
+    {
+        esp_err_t wdt = esp_task_wdt_add(NULL);
+        ESP_LOGI(TAG, "main task subscribed to TWDT: %s", esp_err_to_name(wdt));
+    }
 
     /* ---- Main loop ---- */
     TickType_t last_status  = xTaskGetTickCount();
     TickType_t last_refresh = xTaskGetTickCount();
 
     while (1) {
+        (void)esp_task_wdt_reset();
         screen_timeout_tick();
         vTaskDelay(pdMS_TO_TICKS(500));
 
@@ -422,6 +450,7 @@ void app_main(void)
                      (int)turnout_manager_get_count(),
                      wifi_sta_state_name(wifi_sta_state()),
                      wifi_sta_ip()[0] ? wifi_sta_ip() : "-");
+            sd_log_flush();
 #else
             ESP_LOGI(TAG, "heap=%lu LCC=%s screen=%s turnouts=%d",
                      esp_get_free_heap_size(),

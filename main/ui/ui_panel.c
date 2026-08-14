@@ -59,7 +59,7 @@ static lv_point_t s_track_points[PANEL_MAX_TRACKS][2];
 #define COLOR_UNKNOWN   0x9E9E9E    // Grey
 #define COLOR_STALE     0xF44336    // Red
 #define COLOR_TRACK     0x424242    // Dark grey for track lines
-#define COLOR_PANEL_BG  0x1E1E1E    // Dark background for layout
+#define COLOR_PANEL_BG  UI_PANEL_BG_RGB    // Light lilac; black/green/red icons read on it
 #define COLOR_ORPHAN    0x795548    // Brown for unresolved turnouts
 
 /** @brief Padding (pixels) inside canvas when auto-fitting the layout */
@@ -444,15 +444,22 @@ void ui_create_panel_screen(void)
     lv_obj_t *gear_label = lv_label_create(settings_btn);
     lv_label_set_text(gear_label, LV_SYMBOL_SETTINGS);
     lv_obj_set_style_text_font(gear_label, &lv_font_montserrat_16, LV_PART_MAIN);
-    lv_obj_set_style_text_color(gear_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+    lv_obj_set_style_text_color(gear_label, lv_color_hex(0x000000), LV_PART_MAIN);
     lv_obj_center(gear_label);
 
     // Wi-Fi status, top row, right-justified with a gap from the gear.
     // Gear stays at (width-48, 6); do not move it.
     {
         const lv_coord_t gear_x = PANEL_CANVAS_WIDTH - 40 - 8;
-        const lv_coord_t gap = 28;
-        ui_wifi_icon_attach(scr, gear_x - gap - 36, 8);
+        const lv_coord_t gap = 20;
+        const lv_coord_t wifi_x = gear_x - gap - UI_WIFI_ICON_W;
+        const lv_coord_t can_x = wifi_x - 8 - UI_CAN_ICON_W;
+        const lv_coord_t jmri_x = can_x - 8 - UI_JMRI_ICON_W;
+        const lv_coord_t lcc_x = jmri_x - 8 - UI_LCC_ICON_W;
+        ui_wifi_icon_attach(scr, wifi_x, 8);
+        ui_can_icon_attach(scr, can_x, 8);
+        ui_jmri_icon_attach(scr, jmri_x, 8);
+        ui_lcc_icon_attach(scr, lcc_x, 8);
     }
 
     // --- Empty state ---

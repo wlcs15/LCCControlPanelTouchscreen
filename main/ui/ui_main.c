@@ -99,7 +99,16 @@ static void ui_create_settings_screen(void)
     lv_obj_set_style_text_color(back_label, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
     lv_obj_center(back_label);
 
-    ui_wifi_icon_attach(scr, 800 - 36 - 8, 8);
+    {
+        const lv_coord_t wifi_x = 800 - UI_WIFI_ICON_W - 8;
+        const lv_coord_t can_x = wifi_x - 8 - UI_CAN_ICON_W;
+        const lv_coord_t jmri_x = can_x - 8 - UI_JMRI_ICON_W;
+        const lv_coord_t lcc_x = jmri_x - 8 - UI_LCC_ICON_W;
+        ui_wifi_icon_attach(scr, wifi_x, 8);
+        ui_can_icon_attach(scr, can_x, 8);
+        ui_jmri_icon_attach(scr, jmri_x, 8);
+        ui_lcc_icon_attach(scr, lcc_x, 8);
+    }
 
     ESP_LOGI(TAG, "Settings screen created");
     ui_unlock();

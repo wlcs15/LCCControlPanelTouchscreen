@@ -145,6 +145,31 @@ menu "LCC Turnout Panel Configuration"
             help
                 Public SSID default for the provision script prompt only.
                 The compiled firmware reads SSID from the wrap/NVS blob.
+
+        config JMRI_WEB_HOST
+            string "JMRI web host (icon probe)"
+            default "192.168.1.61"
+            help
+                Raspberry Pi running JMRI. Used only to paint the JMRI icon.
+
+        config JMRI_WEB_PORT
+            int "JMRI web TCP port (icon probe)"
+            default 12080
+            range 1 65535
+            help
+                JMRI Tools → Start Web Server.
+
+        config LCC_WIFI_HOST
+            string "LCC GridConnect TCP host (CS-105 or other Wi-Fi node)"
+            default "192.168.1.27"
+            help
+                Wi-Fi LCC path for the LCC icon. Default is the CS-105 hub.
+                The Pi (JMRI host) is also probed on LCC_WIFI_PORT.
+
+        config LCC_WIFI_PORT
+            int "LCC GridConnect TCP port"
+            default 12021
+            range 1 65535
     endmenu
 
 endmenu

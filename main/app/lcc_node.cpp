@@ -25,6 +25,7 @@
 #include "esp_log.h"
 #include "esp_vfs.h"
 #include "esp_timer.h"
+#include "driver/twai.h"
 
 #include "openlcb/SimpleStack.hxx"
 #include "openlcb/SimpleNodeInfoDefs.hxx"
@@ -35,6 +36,7 @@
 #include "utils/format_utils.hxx"
 
 static const char *TAG = "lcc_node";
+static volatile uint32_t s_can_rx_events;
 
 namespace {
 
@@ -223,6 +225,7 @@ public:
                             BarrierNotifiable *done) override
     {
         AutoNotify n(done);
+        s_can_rx_events++;
         route_event(event->event);
     }
 
@@ -237,6 +240,7 @@ public:
         AutoNotify n(done);
         // Only act on the VALID (active) producer state.
         if (event->state != openlcb::EventState::VALID) return;
+        s_can_rx_events++;
         route_event(event->event);
     }
 
@@ -503,6 +507,24 @@ lcc_status_t lcc_node_get_status(void)
 uint64_t lcc_node_get_node_id(void)
 {
     return s_node_id;
+}
+
+bool lcc_node_wired_link_ok(void)
+{
+    if (s_status != LCC_STATUS_RUNNING || s_twai == nullptr)
+    {
+        return false;
+    }
+    twai_status_info_t info = {};
+    if (twai_get_status_info(&info) != ESP_OK)
+    {
+        return false;
+    }
+    if (info.state != TWAI_STATE_RUNNING)
+    {
+        return false;
+    }
+    return (s_can_rx_events > 0) || (info.msgs_to_rx > 0);
 }
 
 uint16_t lcc_node_get_screen_timeout_sec(void)

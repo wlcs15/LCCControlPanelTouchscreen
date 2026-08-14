@@ -77,6 +77,11 @@ lcc_status_t lcc_node_get_status(void);
 uint64_t lcc_node_get_node_id(void);
 
 /**
+ * @brief True when another node has been heard on the wired CAN/TWAI bus.
+ */
+bool lcc_node_wired_link_ok(void);
+
+/**
  * @brief Get screen backlight timeout from CDI config
  * 
  * @return Timeout in seconds (0 = disabled)
