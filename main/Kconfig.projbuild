@@ -160,17 +160,17 @@ menu "LCC Turnout Panel Configuration"
                 JMRI Tools → Start Web Server.
 
         config LCC_WIFI_HOST
-            string "LCC GridConnect TCP host (this laptop JMRI hub)"
-            default "192.168.1.57"
+            string "Optional static LCC hub IPv4 (empty = mDNS only)"
+            default ""
             help
-                Wi-Fi IPv4 of the JMRI OpenLCB hub. Also the GridConnect
-                uplink (not only the icon probe).
+                Leave empty. Firmware queries mDNS _openlcb-can._tcp for
+                the JMRI OpenLCB hub. A non-empty IPv4 is only a fallback.
 
         config LCC_WIFI_HOST2
-            string "LCC GridConnect TCP fallback host (Ethernet)"
-            default "192.168.1.82"
+            string "Optional second static LCC hub IPv4"
+            default ""
             help
-                Dual-home Ethernet IPv4 of the same hub. Empty disables it.
+                Second fallback after mDNS and LCC_WIFI_HOST. Empty skips it.
 
         config LCC_WIFI_PORT
             int "LCC GridConnect TCP port"

@@ -42,6 +42,8 @@
 
 #include "lwip/netdb.h"
 #include "lwip/sockets.h"
+#include "esp_netif.h"
+#include "mdns.h"
 
 static const char *TAG = "lcc_node";
 static volatile uint32_t s_can_rx_events;
@@ -63,6 +65,16 @@ static DeviceClosedNotify s_wifi_hub_closed(&s_wifi_hub_fd, "jmri-hub");
 static int tcp_connect_host(const char *host, int port)
 {
     if (!host || host[0] == '\0' || port <= 0)
+    {
+        return -1;
+    }
+    if (!strncmp(host, "127.", 4) || !strncmp(host, "0.", 2) ||
+        !strncmp(host, "169.254.", 8))
+    {
+        return -1;
+    }
+    const char *self = wifi_sta_ip();
+    if (self && self[0] && strcmp(host, self) == 0)
     {
         return -1;
     }
@@ -92,18 +104,95 @@ static int tcp_connect_host(const char *host, int port)
     return fd;
 }
 
+static void ensure_mdns(void)
+{
+    static bool ready;
+    if (ready)
+    {
+        return;
+    }
+    const esp_err_t err = mdns_init();
+    if (err == ESP_OK || err == ESP_ERR_INVALID_STATE)
+    {
+        ready = true;
+        return;
+    }
+    ESP_LOGW(TAG, "mdns_init %s", esp_err_to_name(err));
+}
+
+static int connect_mdns_hub(void)
+{
+    ensure_mdns();
+    mdns_result_t *results = nullptr;
+    if (mdns_query_ptr("_openlcb-can", "_tcp", 3000, 8, &results) != ESP_OK ||
+        !results)
+    {
+        ESP_LOGW(TAG, "mDNS _openlcb-can._tcp: no result");
+        return -1;
+    }
+    int fd = -1;
+    for (mdns_result_t *res = results; res && fd < 0; res = res->next)
+    {
+        const int port = res->port ? res->port : CONFIG_LCC_WIFI_PORT;
+        for (mdns_ip_addr_t *ipaddr = res->addr; ipaddr && fd < 0;
+             ipaddr = ipaddr->next)
+        {
+            if (ipaddr->addr.type != IPADDR_TYPE_V4)
+            {
+                continue;
+            }
+            char host[16];
+            snprintf(host, sizeof(host), IPSTR,
+                     IP2STR(&ipaddr->addr.u_addr.ip4));
+            ESP_LOGI(TAG, "mDNS _openlcb-can._tcp %s:%d (%s)", host, port,
+                     res->hostname ? res->hostname : "");
+            fd = tcp_connect_host(host, port);
+            if (fd >= 0)
+            {
+                ESP_LOGI(TAG, "hub %s:%d connected", host, port);
+            }
+        }
+    }
+    mdns_query_results_free(results);
+    return fd;
+}
+
+static int connect_hub(void)
+{
+    int fd = connect_mdns_hub();
+    if (fd >= 0)
+    {
+        return fd;
+    }
+    fd = tcp_connect_host(CONFIG_LCC_WIFI_HOST, CONFIG_LCC_WIFI_PORT);
+    if (fd >= 0)
+    {
+        ESP_LOGI(TAG, "hub %s:%d connected", CONFIG_LCC_WIFI_HOST,
+                 CONFIG_LCC_WIFI_PORT);
+        return fd;
+    }
+    fd = tcp_connect_host(CONFIG_LCC_WIFI_HOST2, CONFIG_LCC_WIFI_PORT);
+    if (fd >= 0)
+    {
+        ESP_LOGI(TAG, "hub %s:%d connected", CONFIG_LCC_WIFI_HOST2,
+                 CONFIG_LCC_WIFI_PORT);
+    }
+    return fd;
+}
+
 static void wifi_hub_task(void *arg)
 {
     (void)arg;
     for (;;)
     {
+        if (s_wifi_hub_attached && s_wifi_hub_fd < 0)
+        {
+            s_wifi_hub_attached = false;
+            ESP_LOGW(TAG, "Wi-Fi hub closed, retry");
+        }
         if (!s_wifi_hub_attached && wifi_sta_state() == WIFI_STA_CONNECTED)
         {
-            int fd = tcp_connect_host(CONFIG_LCC_WIFI_HOST, CONFIG_LCC_WIFI_PORT);
-            if (fd < 0 && CONFIG_LCC_WIFI_HOST2[0] != '\0')
-            {
-                fd = tcp_connect_host(CONFIG_LCC_WIFI_HOST2, CONFIG_LCC_WIFI_PORT);
-            }
+            const int fd = connect_hub();
             if (fd >= 0)
             {
                 ESP_LOGI(TAG, "Wi-Fi GridConnect hub fd=%d", fd);
@@ -552,7 +641,7 @@ esp_err_t lcc_node_init(const lcc_config_t *config)
     // Start executor
     ESP_LOGI(TAG, "Starting executor thread...");
     s_stack->start_executor_thread("lcc_exec", 5, 4096);
-    xTaskCreate(wifi_hub_task, "lcc_wifi_hub", 4096, nullptr, 4, nullptr);
+    xTaskCreate(wifi_hub_task, "lcc_wifi_hub", 8192, nullptr, 4, nullptr);
 
     // Register custom memory spaces
     s_config_space = new SyncingFileMemorySpace(config_fd, openlcb::CONFIG_FILE_SIZE);

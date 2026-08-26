@@ -46,6 +46,7 @@ idf_component_register(
         mbedtls
         spi_flash
         lwip
+        mdns
 )
 
 # Set C++ standard for OpenMRN compatibility
