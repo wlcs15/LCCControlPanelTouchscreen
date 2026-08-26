@@ -1,6 +1,7 @@
 // Unwrap the house Wi-Fi PSK with AES-256-GCM.
-// Key = HKDF-SHA256(IKM = flash_uid || MAC || node,
+// Key = HKDF-SHA256(IKM = flash_uid || MAC,
 //                   info = OwlThree 05.01.01.01.A5 || MAC).
+// Node ID is not in the wrap key so SD nodeid.txt can change without re-wrap.
 // Host encrypts (utils/wifi_wrap.py); this file only decrypts live IDs.
 // This is obfuscation bound to this module, not Flash Encryption.
 
@@ -36,7 +37,7 @@ static const char *kNvsSsid = "ssid";
 static const uint8_t kOwlThreePrefix[] = {0x05, 0x01, 0x01, 0x01, 0xA5};
 
 // Distinct from the D1 R32 salt so a wrap from that board cannot be reused.
-static const char *kHkdfSalt = "owlthree-ws43b-wifi-wrap-v1";
+static const char *kHkdfSalt = "owlthree-ws43b-wifi-wrap-v2";
 
 static uint64_t s_node_id;
 
@@ -96,34 +97,27 @@ void wifi_hw_ids_read(uint8_t mac[6], uint8_t flash_uid[8], bool *uid_ok)
     get_flash_uid(flash_uid, uid_ok);
 }
 
-// IKM = flash_uid || MAC || node
+// IKM = flash_uid || MAC (not the OpenLCB node ID)
 static esp_err_t derive_wrap_key(uint8_t key[32])
 {
     uint8_t mac[6];
     uint8_t uid[8];
-    uint8_t ikm[20];
+    uint8_t ikm[14];
     uint8_t info[11];
     bool uid_ok = false;
-    const uint64_t node = wifi_node_id();
 
     get_mac(mac);
     get_flash_uid(uid, &uid_ok);
     if (!uid_ok)
     {
-        ESP_LOGW(TAG, "flash unique id unavailable; wrap key uses MAC + node ID");
+        ESP_LOGW(TAG, "flash unique id unavailable; wrap key uses MAC only");
     }
     memcpy(ikm, uid, 8);
     memcpy(ikm + 8, mac, 6);
-    ikm[14] = (uint8_t)((node >> 40) & 0xFF);
-    ikm[15] = (uint8_t)((node >> 32) & 0xFF);
-    ikm[16] = (uint8_t)((node >> 24) & 0xFF);
-    ikm[17] = (uint8_t)((node >> 16) & 0xFF);
-    ikm[18] = (uint8_t)((node >> 8) & 0xFF);
-    ikm[19] = (uint8_t)(node & 0xFF);
     memcpy(info, kOwlThreePrefix, 5);
     memcpy(info + 5, mac, 6);
 
-    ESP_LOGI(TAG, "wrap bind MAC %02X:%02X:%02X:%02X:%02X:%02X (not the PSK)",
+    ESP_LOGI(TAG, "wrap bind MAC %02X:%02X:%02X:%02X:%02X:%02X (chip only, not node ID)",
              mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
     const int rc = mbedtls_hkdf(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256),
@@ -231,6 +225,41 @@ esp_err_t wifi_cred_load(char *ssid, size_t ssid_len, char *psk, size_t psk_len)
     }
 
     wrap_blob blob;
+
+#if WIFI_WRAP_BLOB_PRESENT
+    // Baked wrap wins over NVS so a new provision is not stuck behind
+    // an old NVS blob (dummy Password! or v1 key). Wrap-free rebuilds
+    // omit the blob and keep NVS.
+    static_assert(sizeof(blob) == sizeof(kWifiWrapBlob), "wrap blob size mismatch");
+    if (strlen(kWifiWrapSsid) >= ssid_len)
+    {
+        memset(key, 0, sizeof(key));
+        return ESP_ERR_INVALID_SIZE;
+    }
+    memcpy(&blob, kWifiWrapBlob, sizeof(blob));
+    strncpy(ssid, kWifiWrapSsid, ssid_len - 1);
+    ssid[ssid_len - 1] = '\0';
+    err = gcm_decrypt(key, &blob, psk, psk_len);
+    if (err == ESP_OK)
+    {
+        wrap_blob nvs_blob;
+        char nvs_ssid[33] = {0};
+        const bool nvs_ok = (nvs_load(nvs_ssid, sizeof(nvs_ssid), &nvs_blob) == ESP_OK);
+        if (!nvs_ok || memcmp(&nvs_blob, &blob, sizeof(blob)) != 0)
+        {
+            (void)nvs_save(ssid, &blob);
+            ESP_LOGI(TAG, "PSK unwrapped from baked ciphertext and stored in NVS");
+        }
+        else
+        {
+            ESP_LOGI(TAG, "PSK unwrapped from baked ciphertext (NVS already matches)");
+        }
+        memset(key, 0, sizeof(key));
+        return ESP_OK;
+    }
+    ESP_LOGW(TAG, "baked wrap unwrap failed; trying NVS");
+#endif
+
     err = nvs_load(ssid, ssid_len, &blob);
     if (err == ESP_OK)
     {
@@ -243,38 +272,7 @@ esp_err_t wifi_cred_load(char *ssid, size_t ssid_len, char *psk, size_t psk_len)
         return err;
     }
 
-#if WIFI_WRAP_BLOB_PRESENT
-    static_assert(sizeof(blob) == sizeof(kWifiWrapBlob), "wrap blob size mismatch");
-    if (strlen(kWifiWrapSsid) >= ssid_len)
-    {
-        memset(key, 0, sizeof(key));
-        return ESP_ERR_INVALID_SIZE;
-    }
-    memcpy(&blob, kWifiWrapBlob, sizeof(blob));
-    strncpy(ssid, kWifiWrapSsid, ssid_len - 1);
-    ssid[ssid_len - 1] = '\0';
-    err = gcm_decrypt(key, &blob, psk, psk_len);
-    if (err != ESP_OK)
-    {
-        memset(key, 0, sizeof(key));
-        return err;
-    }
-    err = nvs_save(ssid, &blob);
     memset(key, 0, sizeof(key));
-    if (err == ESP_OK)
-    {
-        ESP_LOGI(TAG, "PSK unwrapped from baked ciphertext and stored in NVS. Rebuild later without the wrap file; do not erase-flash.");
-    }
-    else
-    {
-        ESP_LOGW(TAG, "PSK unwrapped from baked ciphertext; NVS save failed (%s)",
-                 esp_err_to_name(err));
-        err = ESP_OK;
-    }
-    return err;
-#else
-    memset(key, 0, sizeof(key));
-    ESP_LOGW(TAG, "No NVS wrap yet. Collect IDs, then run utils/provision_wifi_build.sh in your terminal.");
+    ESP_LOGW(TAG, "No usable wrap. Collect IDs, then run utils/provision_wifi_build.sh in your terminal.");
     return ESP_ERR_NOT_FOUND;
-#endif
 }

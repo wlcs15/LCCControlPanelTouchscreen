@@ -1,4 +1,33 @@
 {
-    "version": 1,
-    "turnouts": []
+  "version": 1,
+  "turnouts": [
+    {
+      "id": 1,
+      "order": 0,
+      "name": "TO3",
+      "event_normal": "05.01.01.01.A5.02.00.01",
+      "event_reverse": "05.01.01.01.A5.02.00.00"
+    },
+    {
+      "id": 2,
+      "order": 1,
+      "name": "TO4",
+      "event_normal": "05.01.01.01.A5.02.01.01",
+      "event_reverse": "05.01.01.01.A5.02.01.00"
+    },
+    {
+      "id": 3,
+      "order": 2,
+      "name": "TO5",
+      "event_normal": "05.01.01.01.A5.03.00.01",
+      "event_reverse": "05.01.01.01.A5.03.00.00"
+    },
+    {
+      "id": 4,
+      "order": 3,
+      "name": "TO6",
+      "event_normal": "05.01.01.01.A5.03.01.01",
+      "event_reverse": "05.01.01.01.A5.03.01.00"
+    }
+  ]
 }

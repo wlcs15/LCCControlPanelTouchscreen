@@ -10,7 +10,7 @@
 extern "C" {
 #endif
 
-// Bind the wrap key to this OpenLCB node ID (from SD / LCC). Call before load.
+// Record the OpenLCB node ID (from SD / LCC). Wrap key does not use it.
 void wifi_cred_set_node_id(uint64_t node_id);
 uint64_t wifi_node_id(void);
 

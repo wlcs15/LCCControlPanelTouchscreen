@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<layout-config>
+  <turnouts class="jmri.jmrix.openlcb.OlcbTurnoutManagerXml">
+    <turnout inverted="false">
+      <systemName>MT05.01.01.01.A5.02.00.00;05.01.01.01.A5.02.00.01</systemName>
+      <userName>TO3</userName>
+    </turnout>
+    <turnout inverted="false">
+      <systemName>MT05.01.01.01.A5.02.01.00;05.01.01.01.A5.02.01.01</systemName>
+      <userName>TO4</userName>
+    </turnout>
+    <turnout inverted="false">
+      <systemName>MT05.01.01.01.A5.03.00.00;05.01.01.01.A5.03.00.01</systemName>
+      <userName>TO5</userName>
+    </turnout>
+    <turnout inverted="false">
+      <systemName>MT05.01.01.01.A5.03.01.00;05.01.01.01.A5.03.01.01</systemName>
+      <userName>TO6</userName>
+    </turnout>
+  </turnouts>
+</layout-config>

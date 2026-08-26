@@ -3,7 +3,8 @@
 #
 # Prerequisites:
 #   1. Flash a wrap-free image (utils/build_idf5.sh flash)
-#   2. Collect IDs: ./utils/collect_hw_ids.py --port /dev/ttyACM0
+#   2. Collect IDs: ./utils/collect_hw_ids.py --port /dev/ttyACM2 --no-reset
+#      (USB-JTAG). Node ID on SD is not part of the wrap key (v2).
 #   3. This script (hidden prompt) host-encrypts and bakes ciphertext only
 #
 # The PSK is not accepted as a command-line argument, is not written to a
@@ -98,11 +99,13 @@ wipe() {
 trap wipe EXIT INT TERM HUP
 
 echo "SSID in wrap blob: ${WIFI_SSID}"
+echo "Wrap key is flash UID + MAC (v2). OpenLCB node ID is not in the wrap."
 echo "Encrypting on the host. Only ciphertext will be compiled in."
 
 printf '%s' "$WIFI_PASSWORD" | python3 "$ROOT/utils/wifi_wrap.py" encrypt \
     --ids "$IDS" \
     --ssid "$WIFI_SSID" \
+    --root "$ROOT" \
     --out "$WRAP_OUT"
 
 wipe

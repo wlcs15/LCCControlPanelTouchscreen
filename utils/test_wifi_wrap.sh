@@ -11,13 +11,17 @@ trap 'rm -rf "$TMP"' EXIT
 echo "== wifi_wrap selftest =="
 "$PY" "$ROOT/utils/wifi_wrap.py" selftest
 
+echo "== wifi_wrap golden vectors (Password!; node ID ignored) =="
+"$PY" "$ROOT/utils/test_wifi_wrap_vectors.py"
+
 echo "== collect_hw_ids from fake log =="
 "$PY" "$ROOT/utils/collect_hw_ids.py" \
     --from-log "$ROOT/utils/testdata/fake_debug_ids.txt" \
     --out "$TMP/hw_ids.env"
 
 grep -q 'WIFI_MAC=DE:AD:BE:EF:00:01' "$TMP/hw_ids.env"
-grep -q 'WIFI_NODE_ID=05.01.01.01.A5.31' "$TMP/hw_ids.env"
+# SD / sdcard/nodeid.txt wins over the serial DEBUG line (A5.31 in the fake log).
+grep -q 'WIFI_NODE_ID=05.01.01.01.A5.04' "$TMP/hw_ids.env"
 grep -q 'WIFI_FLASH_UID=0123456789ABCDEF' "$TMP/hw_ids.env"
 
 echo "== host encrypt fake PSK to wrap include =="

@@ -21,7 +21,7 @@ extern "C" {
 /**
  * @brief Default LCC node ID if nodeid.txt is not present
  */
-#define LCC_DEFAULT_NODE_ID 0x050101019F6000ULL
+#define LCC_DEFAULT_NODE_ID 0x05010101A504ULL
 
 /**
  * @brief LCC Node status

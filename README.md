@@ -113,7 +113,7 @@ The firmware joins the house AP using the same host wrap as the D1 R32 tree: AES
 ./utils/provision_wifi_build.sh -p /dev/ttyACM0 flash
 ```
 
-A wrap-free boot logs `WiFi password: NOT SET` and shows a dim dot. After provision: search (yellow low bar), then three green bars or the slashed fail icon. Changing `nodeid.txt` after provision breaks unwrap — collect IDs again.
+A wrap-free boot logs `WiFi password: NOT SET` and shows a dim dot. After provision: search (yellow low bar), then three green bars or the slashed fail icon. Wrap key is this chip’s flash UID + MAC (v2). Changing `nodeid.txt` does not require a new wrap.
 
 ### VS Code with ESP-IDF Extension
 
@@ -158,8 +158,8 @@ The `sdcard/` directory in this repository contains template files that you can 
 
 1. Format your SD card as FAT32
 2. Copy all files from the `sdcard/` folder to the root of your SD card
-3. Edit `nodeid.txt` with your unique LCC node ID (see below)
-4. Optionally pre-populate `turnouts.json` with your turnout definitions
+3. Copy `nodeid.txt`, `turnouts.json`, `panel.json`, and `roster.xml` from `sdcard/`
+4. This tree’s examples use OwlThree **`05.01.01.01.A5.04`** (S3 panel). Do not reuse `.A5.01` (D1 R32 display), `.A5.02` (Mega), or `.A5.03` (D1 R32 servo).
 
 ### File Reference
 
@@ -168,10 +168,10 @@ The `sdcard/` directory in this repository contains template files that you can 
 Plain text file containing the 48-bit LCC node ID in dotted hex format:
 
 ```
-05.01.01.01.9F.60.00
+05.01.01.01.A5.04
 ```
 
-**Format:** 7 groups of 2 hex digits separated by periods (case insensitive, no spaces).
+**Format:** 6 groups of 2 hex digits (48-bit OpenLCB node ID), periods, no extra bytes. OwlThree registry range is `05.01.01.01.A5.00`–`.FF`.
 
 **Generating a Unique Node ID:**
 - Use the [OpenLCB Node ID Registry](https://registry.openlcb.org/)
@@ -198,20 +198,18 @@ Binary file automatically created by OpenMRN. Stores LCC configuration data:
 
 All settings are configurable via any LCC configuration tool (JMRI, etc.).
 
-#### `turnouts.json`
+#### `turnouts.json` / `panel.json`
 
-```json
-{
-  "version": 1,
-  "turnouts": [
-    {
-      "name": "Main Yard Lead",
-      "event_normal": "05.01.01.01.40.00.00.00",
-      "event_reverse": "05.01.01.01.40.00.00.01"
-    }
-  ]
-}
-```
+Snowball Creek loop (this repo’s `sdcard/`): four turnouts matching the JMRI oval.
+
+| Name | Closed (`event_normal`) | Thrown (`event_reverse`) |
+| --- | --- | --- |
+| TO3 | `05.01.01.01.A5.02.00.01` | `05.01.01.01.A5.02.00.00` |
+| TO4 | `05.01.01.01.A5.02.01.01` | `05.01.01.01.A5.02.01.00` |
+| TO5 | `05.01.01.01.A5.03.00.01` | `05.01.01.01.A5.03.00.00` |
+| TO6 | `05.01.01.01.A5.03.01.01` | `05.01.01.01.A5.03.01.00` |
+
+`panel.json` is the author’s grid format (rotation 0–7, `mirrored`, `turnout:N` / `endpoint:N` tracks). 180° ends are polylines; reverse legs are 45° Ys. Loaded at boot; Save in the panel builder writes it back.
 
 #### `roster.xml` (Optional — JMRI Import)
 

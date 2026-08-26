@@ -223,7 +223,7 @@ After successful flashing, configure your device via SD card. See [README.md - S
 
 1. **`nodeid.txt`** — Your LCC node ID in dotted hex format:
    ```
-   05.01.01.01.9F.60.00
+   05.01.01.01.A5.04
    ```
    See [Node ID Configuration](#node-id-configuration) below.
 
@@ -252,11 +252,11 @@ The device needs a **unique** LCC node ID. You have two options:
 Create a plain text file on the SD card root with your 48-bit node ID in dotted hex format:
 
 ```
-05.01.01.01.9F.60.00
+05.01.01.01.A5.04
 ```
 
 **Format rules:**
-- 7 groups of 2 hex digits
+- 6 groups of 2 hex digits (48-bit OpenLCB node ID)
 - Separated by periods
 - No spaces or extra characters
 - Case insensitive

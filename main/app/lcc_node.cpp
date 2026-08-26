@@ -34,7 +34,14 @@
 #include "openlcb/EventHandlerTemplates.hxx"
 #include "utils/ConfigUpdateListener.hxx"
 #include "freertos_drivers/esp32/Esp32HardwareTwai.hxx"
+#include "sdkconfig.h"
+#include "utils/ClientConnection.hxx"
 #include "utils/format_utils.hxx"
+#include "utils/GridConnectHub.hxx"
+#include "wifi_sta.h"
+
+#include "lwip/netdb.h"
+#include "lwip/sockets.h"
 
 static const char *TAG = "lcc_node";
 static volatile uint32_t s_can_rx_events;
@@ -49,6 +56,66 @@ static lcc_status_t s_status = LCC_STATUS_UNINITIALIZED;
 static openlcb::NodeID s_node_id = 0;
 static Esp32HardwareTwai *s_twai = nullptr;
 static openlcb::SimpleCanStack *s_stack = nullptr;
+static int s_wifi_hub_fd = -1;
+static bool s_wifi_hub_attached;
+static DeviceClosedNotify s_wifi_hub_closed(&s_wifi_hub_fd, "jmri-hub");
+
+static int tcp_connect_host(const char *host, int port)
+{
+    if (!host || host[0] == '\0' || port <= 0)
+    {
+        return -1;
+    }
+    char port_s[16];
+    snprintf(port_s, sizeof(port_s), "%d", port);
+    struct addrinfo hints = {};
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    struct addrinfo *res = nullptr;
+    if (getaddrinfo(host, port_s, &hints, &res) != 0 || !res)
+    {
+        return -1;
+    }
+    int fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+    if (fd < 0)
+    {
+        freeaddrinfo(res);
+        return -1;
+    }
+    const int rc = connect(fd, res->ai_addr, res->ai_addrlen);
+    freeaddrinfo(res);
+    if (rc != 0)
+    {
+        close(fd);
+        return -1;
+    }
+    return fd;
+}
+
+static void wifi_hub_task(void *arg)
+{
+    (void)arg;
+    for (;;)
+    {
+        if (!s_wifi_hub_attached && wifi_sta_state() == WIFI_STA_CONNECTED)
+        {
+            int fd = tcp_connect_host(CONFIG_LCC_WIFI_HOST, CONFIG_LCC_WIFI_PORT);
+            if (fd < 0 && CONFIG_LCC_WIFI_HOST2[0] != '\0')
+            {
+                fd = tcp_connect_host(CONFIG_LCC_WIFI_HOST2, CONFIG_LCC_WIFI_PORT);
+            }
+            if (fd >= 0)
+            {
+                ESP_LOGI(TAG, "Wi-Fi GridConnect hub fd=%d", fd);
+                s_wifi_hub_attached = true;
+                s_wifi_hub_fd = fd;
+                create_gc_port_for_can_hub(s_stack->can_hub(), fd,
+                                           &s_wifi_hub_closed, true);
+            }
+        }
+        vTaskDelay(pdMS_TO_TICKS(5000));
+    }
+}
 static openlcb::ConfigDef *s_cfg = nullptr;
 
 /// Cached CDI config values
@@ -356,7 +423,7 @@ namespace openlcb {
 
 extern const SimpleNodeStaticValues SNIP_STATIC_DATA = {
     4,                                    // version
-    "IvanBuilds",                         // manufacturer_name
+    "OwlThree",                           // manufacturer_name
     "LCC Turnout Panel",                  // model_name
     "ESP32S3 TouchLCD 4.3",              // hardware_version
     RR_GIT_VERSION_STR(RR_GIT_VERSION)
@@ -366,7 +433,7 @@ const char CDI_DATA[] =
     R"xmldata(<?xml version="1.0"?>
 <cdi xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://openlcb.org/schema/cdi/1/1/cdi.xsd">
 <identification>
-  <manufacturer>IvanBuilds</manufacturer>
+  <manufacturer>OwlThree</manufacturer>
   <model>LCC Turnout Panel</model>
   <hardwareVersion>Waveshare ESP32-S3 Touch LCD 4.3B</hardwareVersion>
   <softwareVersion>)xmldata" RR_GIT_VERSION_STR(RR_GIT_VERSION) R"xmldata(</softwareVersion>
@@ -485,6 +552,7 @@ esp_err_t lcc_node_init(const lcc_config_t *config)
     // Start executor
     ESP_LOGI(TAG, "Starting executor thread...");
     s_stack->start_executor_thread("lcc_exec", 5, 4096);
+    xTaskCreate(wifi_hub_task, "lcc_wifi_hub", 4096, nullptr, 4, nullptr);
 
     // Register custom memory spaces
     s_config_space = new SyncingFileMemorySpace(config_fd, openlcb::CONFIG_FILE_SIZE);

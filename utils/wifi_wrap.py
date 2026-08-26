@@ -2,9 +2,9 @@
 """Host-side AES-256-GCM wrap for the house Wi-Fi PSK.
 
 Matches main/wifi/wifi_cred.cpp exactly:
-  IKM  = flash_uid[8] || MAC[6] || node[6]
+  IKM  = flash_uid[8] || MAC[6]
   info = 05.01.01.01.A5 || MAC[6]
-  salt = owlthree-ws43b-wifi-wrap-v1
+  salt = owlthree-ws43b-wifi-wrap-v2
   HKDF-SHA256 -> 32-byte key
   AES-256-GCM, 12-byte nonce, 16-byte tag, no AAD
 
@@ -24,7 +24,7 @@ import tempfile
 from hashlib import sha256
 from pathlib import Path
 
-SALT = b"owlthree-ws43b-wifi-wrap-v1"
+SALT = b"owlthree-ws43b-wifi-wrap-v2"
 OWL_PREFIX = bytes([0x05, 0x01, 0x01, 0x01, 0xA5])
 WRAP_VER = 1
 NONCE_LEN = 12
@@ -120,10 +120,52 @@ def write_hw_ids(path: Path, ids: dict[str, str]) -> None:
     )
 
 
-def derive_key(mac: bytes, uid: bytes, node: bytes) -> bytes:
-    if len(mac) != 6 or len(uid) != 8 or len(node) != 6:
-        _die("ID lengths must be MAC=6 UID=8 node=6")
-    ikm = uid + mac + node
+def find_nodeid_file(root: Path) -> Path | None:
+    env = os.environ.get("WIFI_NODEID_FILE", "").strip()
+    if env:
+        p = Path(env)
+        if p.is_file():
+            return p
+    for p in (
+        Path("/media/chucks/ESP32S3/nodeid.txt"),
+        root / "sdcard" / "nodeid.txt",
+    ):
+        if p.is_file():
+            return p
+    return None
+
+
+def read_nodeid_file(path: Path) -> str:
+    text = path.read_text(encoding="utf-8", errors="replace").strip().splitlines()
+    if not text:
+        _die(f"{path} is empty")
+    node = text[0].strip().upper()
+    parse_node(node)
+    return node
+
+
+def overlay_nodeid(ids: dict[str, str], root: Path) -> dict[str, str]:
+    path = find_nodeid_file(root)
+    if path is None:
+        return ids
+    node = read_nodeid_file(path)
+    if ids.get("WIFI_NODE_ID", "").upper() != node:
+        print(
+            f"Using node ID {node} from {path} (was {ids.get('WIFI_NODE_ID', '?')}). "
+            "Wrap key does not include the node ID.",
+            file=sys.stderr,
+        )
+    ids = dict(ids)
+    ids["WIFI_NODE_ID"] = node
+    return ids
+
+
+def derive_key(mac: bytes, uid: bytes, node: bytes | None = None) -> bytes:
+    if len(mac) != 6 or len(uid) != 8:
+        _die("ID lengths must be MAC=6 UID=8")
+    if node is not None and len(node) != 6:
+        _die("node ID must be 6 bytes when provided (logging only)")
+    ikm = uid + mac
     info = OWL_PREFIX + mac
     prk = hmac.new(SALT, ikm, sha256).digest()
     t = b""
@@ -200,11 +242,13 @@ def _read_psk_stdin() -> bytes:
 
 def cmd_encrypt(args: argparse.Namespace) -> None:
     ids = load_hw_ids(Path(args.ids))
+    root = Path(args.root) if getattr(args, "root", None) else Path.cwd()
+    ids = overlay_nodeid(ids, root)
+    write_hw_ids(Path(args.ids), ids)
     mac = parse_mac(ids["WIFI_MAC"])
-    node = parse_node(ids["WIFI_NODE_ID"])
     uid = parse_uid(ids["WIFI_FLASH_UID"])
     psk = _read_psk_stdin()
-    key = derive_key(mac, uid, node)
+    key = derive_key(mac, uid)
     blob = encrypt_psk(key, psk)
     if decrypt_psk(key, blob) != psk:
         _die("internal wrap check failed")
@@ -244,16 +288,15 @@ def cmd_selftest(_args: argparse.Namespace) -> None:
         _die("selftest UNAVAILABLE UID must be 8 zero bytes")
 
     mac = parse_mac(ids["WIFI_MAC"])
-    node = parse_node(ids["WIFI_NODE_ID"])
     uid = parse_uid(ids["WIFI_FLASH_UID"])
-    key = derive_key(mac, uid, node)
+    key = derive_key(mac, uid)
     psk = b"fake-psk-not-a-house-password"
     nonce = bytes(range(12))
     blob = encrypt_psk(key, psk, nonce=nonce)
     if decrypt_psk(key, blob) != psk:
         _die("selftest decrypt mismatch")
 
-    bad_key = derive_key(bytes([0x00]) * 6, uid, node)
+    bad_key = derive_key(bytes([0x00]) * 6, uid)
     try:
         decrypt_psk(bad_key, blob)
     except Exception:
@@ -285,6 +328,7 @@ def main() -> None:
     p_enc.add_argument("--ids", required=True, help="local/hw_ids.env")
     p_enc.add_argument("--ssid", default="SRIF2333")
     p_enc.add_argument("--out", required=True, help="main/wifi/wifi_psk_wrap.inc")
+    p_enc.add_argument("--root", default=".", help="Repo root; used to find sdcard/nodeid.txt")
     p_enc.set_defaults(func=cmd_encrypt)
 
     p_log = sub.add_parser("parse-log", help="Parse a saved DEBUG serial log")

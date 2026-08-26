@@ -120,9 +120,9 @@ menu "LCC Turnout Panel Configuration"
     menu "LCC Settings"
         config LCC_NODE_ID_DEFAULT
             string "Default LCC Node ID"
-            default "05.01.01.01.22.60"
+            default "05.01.01.01.A5.04"
             help
-                Default Node ID if nodeid.txt is missing from SD card.
+                OwlThree 05.01.01.01.A5.04 if nodeid.txt is missing from SD.
 
         config LCC_EVENT_RATE_LIMIT_MS
             int "LCC Event Rate Limit (ms)"
@@ -148,9 +148,9 @@ menu "LCC Turnout Panel Configuration"
 
         config JMRI_WEB_HOST
             string "JMRI web host (icon probe)"
-            default "192.168.1.61"
+            default "192.168.1.57"
             help
-                Raspberry Pi running JMRI. Used only to paint the JMRI icon.
+                This laptop's JMRI web server. Used only to paint the JMRI icon.
 
         config JMRI_WEB_PORT
             int "JMRI web TCP port (icon probe)"
@@ -160,11 +160,17 @@ menu "LCC Turnout Panel Configuration"
                 JMRI Tools → Start Web Server.
 
         config LCC_WIFI_HOST
-            string "LCC GridConnect TCP host (CS-105 or other Wi-Fi node)"
-            default "192.168.1.27"
+            string "LCC GridConnect TCP host (this laptop JMRI hub)"
+            default "192.168.1.57"
             help
-                Wi-Fi LCC path for the LCC icon. Default is the CS-105 hub.
-                The Pi (JMRI host) is also probed on LCC_WIFI_PORT.
+                Wi-Fi IPv4 of the JMRI OpenLCB hub. Also the GridConnect
+                uplink (not only the icon probe).
+
+        config LCC_WIFI_HOST2
+            string "LCC GridConnect TCP fallback host (Ethernet)"
+            default "192.168.1.82"
+            help
+                Dual-home Ethernet IPv4 of the same hub. Empty disables it.
 
         config LCC_WIFI_PORT
             int "LCC GridConnect TCP port"

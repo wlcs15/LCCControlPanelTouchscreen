@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from wifi_wrap import parse_debug_log, write_hw_ids  # noqa: E402
+from wifi_wrap import overlay_nodeid, parse_debug_log, write_hw_ids  # noqa: E402
 
 DEFAULT_OUT = "local/hw_ids.env"
 
@@ -134,10 +134,15 @@ def main() -> None:
     else:
         parser.error("provide --port or --from-log")
 
+    root = Path(__file__).resolve().parent.parent
+    ids = overlay_nodeid(ids, root)
+    write_hw_ids(out_path, ids)
+
     print(f"Wrote {out_path}")
     print(f"MAC Address: {ids['WIFI_MAC']}")
     print(f"OpenLCB Node ID: {ids['WIFI_NODE_ID']}")
     print(f"SPI flash unique ID: {ids['WIFI_FLASH_UID']}")
+    print("Wrap key uses flash UID + MAC only; node ID is for LCC, not the wrap.")
 
 
 if __name__ == "__main__":
