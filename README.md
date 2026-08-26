@@ -2,7 +2,7 @@
 
 An ESP32-S3–based LCC/OpenLCB turnout control panel with a touch LCD user interface for model railroad layout turnout control.
 
-**Tag `v1.0.1` (OwlThree).** Node **05.01.01.01.A5.04**. Joins this laptop’s JMRI OpenLCB hub over Wi-Fi (TCP 12021). SNIP manufacturer **OwlThree** (re-flash the tag to replace IvanBuilds on the chip). Wrap v2 is flash-UID + MAC only; baked `wifi_psk_wrap.inc` overrides stale NVS. SD `sdcard/` is the Snowball Creek loop (TO3–TO6). Native USB is Espressif `303a:1001` `/dev/ttyACM2` — never flash `/dev/ttyACM0` (RR-CirKits gateway). CAN icon stays failed until TWAI is on the layout bus.
+**Tag `v1.0.1` (OwlThree).** Node **05.01.01.01.A5.04**. Joins this laptop’s JMRI OpenLCB hub over Wi-Fi via mDNS `_openlcb-can._tcp` (TCP 12021). SNIP manufacturer **OwlThree** (re-flash to replace IvanBuilds on the chip). Wrap v2 is flash-UID + MAC only; baked `wifi_psk_wrap.inc` overrides stale NVS. SD `sdcard/` is the Snowball Creek loop (TO3–TO6). Native USB is Espressif `303a:1001` **`/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_1C:DB:D4:42:EF:D0-if00`** (often `ttyACM2`; numbers swap). **Never flash** the Mega `usb-Arduino__www.arduino.cc__0042_85036313230351A00280-if00` or the RR-CirKits gateway `usb-STMicroelectronics_STM32_Virtual_ComPort_209737A73931-if00`. If USB-JTAG disappears, hold **BOOT** and replug the native USB-C. CAN icon stays failed until TWAI is on the layout bus.
 
 ![ESP-IDF](https://img.shields.io/badge/ESP--IDF-v5.1.6-blue)
 ![License](https://img.shields.io/badge/license-BSD--2--Clause-green)
