@@ -692,8 +692,14 @@ esp_err_t lcc_node_init(const lcc_config_t *config)
     s_config_space = new SyncingFileMemorySpace(config_fd, openlcb::CONFIG_FILE_SIZE);
     s_stack->memory_config_handler()->registry()->insert(
         s_stack->node(), openlcb::MemoryConfigDefs::SPACE_CONFIG, s_config_space);
-    
-    s_acdi_usr_space = new SyncingFileMemorySpace(config_fd, 128);
+
+    /* Second open so ACDI lseek does not move the config space offset. */
+    int acdi_fd = open(openlcb::CONFIG_FILENAME, O_RDWR);
+    if (acdi_fd < 0)
+    {
+        acdi_fd = config_fd;
+    }
+    s_acdi_usr_space = new SyncingFileMemorySpace(acdi_fd, 128);
     s_stack->memory_config_handler()->registry()->insert(
         s_stack->node(), openlcb::MemoryConfigDefs::SPACE_ACDI_USR, s_acdi_usr_space);
 
