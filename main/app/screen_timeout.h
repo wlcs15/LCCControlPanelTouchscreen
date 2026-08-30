@@ -32,7 +32,7 @@ extern "C" {
  * 
  * Default is 60 seconds (1 minute). Set to 0 to disable timeout.
  */
-#define SCREEN_TIMEOUT_DEFAULT_SEC  60
+#define SCREEN_TIMEOUT_DEFAULT_SEC  900
 
 /**
  * @brief Minimum screen timeout in seconds (when enabled)

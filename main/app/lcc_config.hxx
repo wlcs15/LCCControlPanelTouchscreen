@@ -21,7 +21,7 @@ namespace openlcb
 static constexpr uint16_t CANONICAL_VERSION = 0x0100;
 
 /// Default screen timeout in seconds (0 = disabled)
-static constexpr uint16_t DEFAULT_SCREEN_TIMEOUT_SEC = 60;
+static constexpr uint16_t DEFAULT_SCREEN_TIMEOUT_SEC = 900;
 
 /// Default state refresh interval in seconds (0 = disabled)
 static constexpr uint16_t DEFAULT_STALE_TIMEOUT_SEC = 120;
@@ -37,7 +37,7 @@ CDI_GROUP_ENTRY(screen_timeout_sec, Uint16ConfigEntry,
     Name("Screen Backlight Timeout (seconds)"),
     Description("Time in seconds before the screen backlight turns off when idle. "
                 "Touch the screen to wake. Set to 0 to disable (always on). "
-                "Range: 0 or 10-3600 seconds. Default: 60 seconds."),
+                "Range: 0 or 10-3600 seconds. Default: 900 seconds (15 minutes)."),
     Default(DEFAULT_SCREEN_TIMEOUT_SEC),
     Min(0),
     Max(3600));

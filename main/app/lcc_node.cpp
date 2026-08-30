@@ -472,7 +472,14 @@ public:
         s_screen_timeout_sec = s_cfg->seg().panel().screen_timeout_sec().read(fd);
         s_stale_timeout_sec = s_cfg->seg().panel().stale_timeout_sec().read(fd);
         s_query_pace_ms = s_cfg->seg().panel().query_pace_ms().read(fd);
-        
+        /* Legacy default was 60 s; layout use wants 15 min. */
+        if (s_screen_timeout_sec == 60)
+        {
+            s_cfg->seg().panel().screen_timeout_sec().write(
+                fd, openlcb::DEFAULT_SCREEN_TIMEOUT_SEC);
+            s_screen_timeout_sec = openlcb::DEFAULT_SCREEN_TIMEOUT_SEC;
+            fsync(fd);
+        }
         if (initial_load) {
             ESP_LOGI(TAG, "Panel config: screen_timeout=%u sec, stale_timeout=%u sec, query_pace=%u ms",
                      s_screen_timeout_sec, s_stale_timeout_sec, s_query_pace_ms);
@@ -540,10 +547,10 @@ const char CDI_DATA[] =
     <name>Panel Configuration</name>
     <int size="2">
       <name>Screen Backlight Timeout (seconds)</name>
-      <description>Time in seconds before the screen backlight turns off when idle. Touch the screen to wake. Set to 0 to disable (always on). Range: 0 or 10-3600 seconds. Default: 60 seconds.</description>
+      <description>Time in seconds before the screen backlight turns off when idle. Touch the screen to wake. Set to 0 to disable (always on). Range: 0 or 10-3600 seconds. Default: 900 seconds (15 minutes).</description>
       <min>0</min>
       <max>3600</max>
-      <default>60</default>
+      <default>900</default>
     </int>
     <int size="2">
       <name>Stale Timeout (seconds)</name>
@@ -626,6 +633,30 @@ esp_err_t lcc_node_init(const lcc_config_t *config)
         s_status = LCC_STATUS_ERROR;
         return ESP_FAIL;
     }
+    /* SNIP FILE_LITERAL_BYTE HASSERTs unless ACDI version at offset 0 is 2. */
+    uint8_t acdi_ver = 0;
+    if (lseek(config_fd, 0, SEEK_SET) == 0 &&
+        read(config_fd, &acdi_ver, 1) == 1 && acdi_ver != 2)
+    {
+        ESP_LOGW(TAG, "ACDI version byte %u (need 2); repairing SNIP", acdi_ver);
+        acdi_ver = 2;
+        if (lseek(config_fd, 0, SEEK_SET) == 0)
+        {
+            (void)write(config_fd, &acdi_ver, 1);
+        }
+    }
+    else if (acdi_ver == 0)
+    {
+        acdi_ver = 2;
+        if (lseek(config_fd, 0, SEEK_SET) == 0)
+        {
+            (void)write(config_fd, &acdi_ver, 1);
+        }
+    }
+    ESP_LOGI(TAG, "SNIP %s / %s / %s",
+             openlcb::SNIP_STATIC_DATA.manufacturer_name,
+             openlcb::SNIP_STATIC_DATA.model_name,
+             openlcb::SNIP_STATIC_DATA.software_version);
     fsync(config_fd);
 
     // Create turnout event handler

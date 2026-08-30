@@ -19,6 +19,7 @@
 # Build artifacts and directories
 **/build/
 build/
+build-win11/
 *.o
 *.a
 *.out

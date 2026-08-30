@@ -89,6 +89,9 @@ def _git(repo, args):
 
 
 def read_repo_version(repo):
+    forced = os.environ.get("RR_SNIP_VERSION", "").strip()
+    if well_formatted_tag(forced):
+        return to_c_token(forced)
     tag = _git(repo, ["describe", "--tags", "--match", VERSION_TAG, "--abbrev=0"])
     if not well_formatted_tag(tag):
         return DEFAULT_SNIP
