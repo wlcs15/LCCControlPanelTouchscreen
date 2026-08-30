@@ -91,12 +91,10 @@ CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU1=y
 # Wi-Fi STA (PSK is never stored here; wrap/NVS only)
 CONFIG_WIFI_STA_ENABLED=y
 CONFIG_WIFI_STA_SSID="SRIF2333"
-CONFIG_JMRI_WEB_HOST="192.168.1.57"
+CONFIG_JMRI_WEB_HOST=""
 CONFIG_JMRI_WEB_PORT=12080
-# Windows JMRI OpenLCB Hub Control does not answer ESP32 mDNS
-# _openlcb-can._tcp (COM10 log: "no result"). Same static fallbacks
-# A5.01 / A5.03 already use: Ethernet then Wi-Fi on this laptop.
-CONFIG_LCC_WIFI_HOST="192.168.1.82"
-CONFIG_LCC_WIFI_HOST2="192.168.1.57"
+# Hub IPv4 from mDNS _openlcb-can._tcp. Empty = no static fallback.
+CONFIG_LCC_WIFI_HOST=""
+CONFIG_LCC_WIFI_HOST2=""
 CONFIG_LCC_WIFI_PORT=12021
 CONFIG_MBEDTLS_HKDF_C=y

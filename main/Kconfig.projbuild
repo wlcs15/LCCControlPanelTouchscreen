@@ -147,10 +147,11 @@ menu "LCC Turnout Panel Configuration"
                 The compiled firmware reads SSID from the wrap/NVS blob.
 
         config JMRI_WEB_HOST
-            string "JMRI web host (icon probe)"
-            default "192.168.1.57"
+            string "Optional JMRI web IPv4 (icon probe; empty = hub IP only)"
+            default ""
             help
-                This laptop's JMRI web server. Used only to paint the JMRI icon.
+                Leave empty. The JMRI icon probes the connected OpenLCB hub
+                IPv4 on JMRI_WEB_PORT. A static IPv4 is optional.
 
         config JMRI_WEB_PORT
             int "JMRI web TCP port (icon probe)"

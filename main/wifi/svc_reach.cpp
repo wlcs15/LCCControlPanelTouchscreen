@@ -95,13 +95,18 @@ static void probe_task(void *arg)
 
         bool wifi_lcc = false;
         bool jmri = false;
+        const char *hub = lcc_node_wifi_hub_ip();
         if (wifi_up)
         {
-            jmri = tcp_is_open(CONFIG_JMRI_WEB_HOST, CONFIG_JMRI_WEB_PORT, 1500);
-            wifi_lcc = tcp_is_open(CONFIG_LCC_WIFI_HOST, CONFIG_LCC_WIFI_PORT, 1500);
-            if (!wifi_lcc)
+            wifi_lcc = lcc_node_wifi_hub_ok();
+            if (hub[0] && tcp_is_open(hub, CONFIG_JMRI_WEB_PORT, 1500))
             {
-                wifi_lcc = tcp_is_open(CONFIG_JMRI_WEB_HOST, CONFIG_LCC_WIFI_PORT, 1500);
+                jmri = true;
+            }
+            else if (CONFIG_JMRI_WEB_HOST[0] &&
+                     tcp_is_open(CONFIG_JMRI_WEB_HOST, CONFIG_JMRI_WEB_PORT, 1500))
+            {
+                jmri = true;
             }
         }
 
@@ -114,11 +119,12 @@ static void probe_task(void *arg)
                  "wifi=%s ip=%s JMRI %s:%d %s CAN %s CS105 %s:%d / Pi %s:%d => LCC %s",
                  wifi_up ? "up" : "down",
                  wifi_sta_ip()[0] ? wifi_sta_ip() : "-",
-                 CONFIG_JMRI_WEB_HOST, CONFIG_JMRI_WEB_PORT,
+                 hub[0] ? hub : (CONFIG_JMRI_WEB_HOST[0] ? CONFIG_JMRI_WEB_HOST : "(mdns)"),
+                 CONFIG_JMRI_WEB_PORT,
                  jmri ? "up" : "down",
                  wired ? "up" : "down",
-                 CONFIG_LCC_WIFI_HOST, CONFIG_LCC_WIFI_PORT,
-                 CONFIG_JMRI_WEB_HOST, CONFIG_LCC_WIFI_PORT,
+                 hub[0] ? hub : "(mdns)", CONFIG_LCC_WIFI_PORT,
+                 "-", CONFIG_LCC_WIFI_PORT,
                  (wired || wifi_lcc) ? "up" : "down");
 
         vTaskDelay(pdMS_TO_TICKS(wifi_up ? 8000 : 2000));

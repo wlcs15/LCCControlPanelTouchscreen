@@ -80,6 +80,8 @@ uint64_t lcc_node_get_node_id(void);
  * @brief True when another node has been heard on the wired CAN/TWAI bus.
  */
 bool lcc_node_wired_link_ok(void);
+bool lcc_node_wifi_hub_ok(void);
+const char *lcc_node_wifi_hub_ip(void);
 
 /**
  * @brief Get screen backlight timeout from CDI config

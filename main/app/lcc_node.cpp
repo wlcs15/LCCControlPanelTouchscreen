@@ -60,7 +60,18 @@ static Esp32HardwareTwai *s_twai = nullptr;
 static openlcb::SimpleCanStack *s_stack = nullptr;
 static int s_wifi_hub_fd = -1;
 static bool s_wifi_hub_attached;
+static char s_wifi_hub_ip[16];
 static DeviceClosedNotify s_wifi_hub_closed(&s_wifi_hub_fd, "jmri-hub");
+
+extern "C" bool lcc_node_wifi_hub_ok(void)
+{
+    return (s_wifi_hub_attached && s_wifi_hub_fd >= 0) ? true : false;
+}
+
+extern "C" const char *lcc_node_wifi_hub_ip(void)
+{
+    return s_wifi_hub_ip;
+}
 
 static int tcp_connect_host(const char *host, int port)
 {
@@ -149,6 +160,8 @@ static int connect_mdns_hub(void)
             fd = tcp_connect_host(host, port);
             if (fd >= 0)
             {
+                strncpy(s_wifi_hub_ip, host, sizeof(s_wifi_hub_ip) - 1);
+                s_wifi_hub_ip[sizeof(s_wifi_hub_ip) - 1] = '\0';
                 ESP_LOGI(TAG, "hub %s:%d connected", host, port);
             }
         }
@@ -188,6 +201,7 @@ static void wifi_hub_task(void *arg)
         if (s_wifi_hub_attached && s_wifi_hub_fd < 0)
         {
             s_wifi_hub_attached = false;
+            s_wifi_hub_ip[0] = '\0';
             ESP_LOGW(TAG, "Wi-Fi hub closed, retry");
         }
         if (!s_wifi_hub_attached && wifi_sta_state() == WIFI_STA_CONNECTED)
