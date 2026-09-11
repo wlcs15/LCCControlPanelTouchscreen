@@ -208,6 +208,56 @@ static esp_err_t nvs_load(char *ssid, size_t ssid_len, wrap_blob *blob)
     return err;
 }
 
+static esp_err_t unwrap_nvs(const uint8_t key[32], char *ssid, size_t ssid_len,
+                            char *psk, size_t psk_len)
+{
+    wrap_blob blob;
+    esp_err_t err = nvs_load(ssid, ssid_len, &blob);
+    if (err != ESP_OK)
+    {
+        return err;
+    }
+    err = gcm_decrypt(key, &blob, psk, psk_len);
+    if (err == ESP_OK)
+    {
+        ESP_LOGI(TAG, "PSK unwrapped from NVS (SSID present, password not logged)");
+    }
+    return err;
+}
+
+#if WIFI_WRAP_BLOB_PRESENT
+static esp_err_t unwrap_baked(const uint8_t key[32], char *ssid, size_t ssid_len,
+                              char *psk, size_t psk_len)
+{
+    wrap_blob blob;
+    static_assert(sizeof(blob) == sizeof(kWifiWrapBlob), "wrap blob size mismatch");
+    if (strlen(kWifiWrapSsid) >= ssid_len)
+    {
+        return ESP_ERR_INVALID_SIZE;
+    }
+    memcpy(&blob, kWifiWrapBlob, sizeof(blob));
+    strncpy(ssid, kWifiWrapSsid, ssid_len - 1);
+    ssid[ssid_len - 1] = '\0';
+    if (gcm_decrypt(key, &blob, psk, psk_len) != ESP_OK)
+    {
+        return ESP_FAIL;
+    }
+    wrap_blob nvs_blob;
+    char nvs_ssid[33] = {0};
+    const bool nvs_ok = (nvs_load(nvs_ssid, sizeof(nvs_ssid), &nvs_blob) == ESP_OK);
+    if (!nvs_ok || memcmp(&nvs_blob, &blob, sizeof(blob)) != 0)
+    {
+        (void)nvs_save(ssid, &blob);
+        ESP_LOGI(TAG, "PSK unwrapped from baked ciphertext and stored in NVS");
+    }
+    else
+    {
+        ESP_LOGI(TAG, "PSK unwrapped from baked ciphertext (NVS already matches)");
+    }
+    return ESP_OK;
+}
+#endif
+
 esp_err_t wifi_cred_load(char *ssid, size_t ssid_len, char *psk, size_t psk_len)
 {
     if (ssid == nullptr || psk == nullptr || ssid_len < 2 || psk_len < 2)
@@ -224,55 +274,30 @@ esp_err_t wifi_cred_load(char *ssid, size_t ssid_len, char *psk, size_t psk_len)
         return err;
     }
 
-    wrap_blob blob;
-
 #if WIFI_WRAP_BLOB_PRESENT
     // Baked wrap wins over NVS so a new provision is not stuck behind
     // an old NVS blob (dummy Password! or v1 key). Wrap-free rebuilds
     // omit the blob and keep NVS.
-    static_assert(sizeof(blob) == sizeof(kWifiWrapBlob), "wrap blob size mismatch");
-    if (strlen(kWifiWrapSsid) >= ssid_len)
-    {
-        memset(key, 0, sizeof(key));
-        return ESP_ERR_INVALID_SIZE;
-    }
-    memcpy(&blob, kWifiWrapBlob, sizeof(blob));
-    strncpy(ssid, kWifiWrapSsid, ssid_len - 1);
-    ssid[ssid_len - 1] = '\0';
-    err = gcm_decrypt(key, &blob, psk, psk_len);
+    err = unwrap_baked(key, ssid, ssid_len, psk, psk_len);
     if (err == ESP_OK)
     {
-        wrap_blob nvs_blob;
-        char nvs_ssid[33] = {0};
-        const bool nvs_ok = (nvs_load(nvs_ssid, sizeof(nvs_ssid), &nvs_blob) == ESP_OK);
-        if (!nvs_ok || memcmp(&nvs_blob, &blob, sizeof(blob)) != 0)
-        {
-            (void)nvs_save(ssid, &blob);
-            ESP_LOGI(TAG, "PSK unwrapped from baked ciphertext and stored in NVS");
-        }
-        else
-        {
-            ESP_LOGI(TAG, "PSK unwrapped from baked ciphertext (NVS already matches)");
-        }
         memset(key, 0, sizeof(key));
         return ESP_OK;
+    }
+    if (err == ESP_ERR_INVALID_SIZE)
+    {
+        memset(key, 0, sizeof(key));
+        return err;
     }
     ESP_LOGW(TAG, "baked wrap unwrap failed; trying NVS");
 #endif
 
-    err = nvs_load(ssid, ssid_len, &blob);
+    err = unwrap_nvs(key, ssid, ssid_len, psk, psk_len);
+    memset(key, 0, sizeof(key));
     if (err == ESP_OK)
     {
-        err = gcm_decrypt(key, &blob, psk, psk_len);
-        memset(key, 0, sizeof(key));
-        if (err == ESP_OK)
-        {
-            ESP_LOGI(TAG, "PSK unwrapped from NVS (SSID present, password not logged)");
-        }
         return err;
     }
-
-    memset(key, 0, sizeof(key));
     ESP_LOGW(TAG, "No usable wrap. Collect IDs, then run utils/provision_wifi_build.sh in your terminal.");
     return ESP_ERR_NOT_FOUND;
 }

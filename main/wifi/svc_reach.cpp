@@ -10,6 +10,7 @@
 #include "lwip/netdb.h"
 #include "lwip/sockets.h"
 #include "sdkconfig.h"
+#include "SvcReachPick.h"
 #include "ui_wifi_icon.h"
 #include "wifi_sta.h"
 
@@ -81,53 +82,86 @@ static void apply_mark(int which, ui_mark_icon_t st)
     }
 }
 
+static int probe_jmri_web(int wifi_up, const char *hub)
+{
+    if (!wifi_up)
+    {
+        return 0;
+    }
+    if (hub && hub[0] && tcp_is_open(hub, CONFIG_JMRI_WEB_PORT, 1500))
+    {
+        return 1;
+    }
+    if (CONFIG_JMRI_WEB_HOST[0] &&
+        tcp_is_open(CONFIG_JMRI_WEB_HOST, CONFIG_JMRI_WEB_PORT, 1500))
+    {
+        return 1;
+    }
+    return 0;
+}
+
+static void apply_reach_icons(int wifi_up, int jmri, int wired, int wifi_lcc)
+{
+    apply_mark(0, s3_jmri_icon_ok(wifi_up, jmri) ? UI_JMRI_ICON_OK
+                                                 : UI_JMRI_ICON_FAIL);
+    apply_mark(2, s3_can_icon_ok(wired) ? UI_JMRI_ICON_OK : UI_JMRI_ICON_FAIL);
+    apply_mark(1, s3_lcc_icon_ok(wired, wifi_lcc) ? UI_JMRI_ICON_OK
+                                                  : UI_JMRI_ICON_FAIL);
+}
+
+static const char *up_down(int ok)
+{
+    return ok ? "up" : "down";
+}
+
+static void log_reach(int wifi_up, int jmri, int wired, int wifi_lcc,
+                      const char *hub)
+{
+    const char *web = "(mdns)";
+    const char *lcc_host = "(mdns)";
+    const char *ip = wifi_sta_ip();
+    if (hub && hub[0])
+    {
+        web = hub;
+        lcc_host = hub;
+    }
+    else if (CONFIG_JMRI_WEB_HOST[0])
+    {
+        web = CONFIG_JMRI_WEB_HOST;
+    }
+    if (!ip[0])
+    {
+        ip = "-";
+    }
+    ESP_LOGI(TAG,
+             "wifi=%s ip=%s JMRI %s:%d %s CAN %s CS105 %s:%d / Pi %s:%d => LCC %s",
+             up_down(wifi_up), ip, web, CONFIG_JMRI_WEB_PORT, up_down(jmri),
+             up_down(wired), lcc_host, CONFIG_LCC_WIFI_PORT, "-",
+             CONFIG_LCC_WIFI_PORT, up_down(wired || wifi_lcc));
+}
+
+static void probe_once(void)
+{
+    const int wifi_up = (wifi_sta_state() == WIFI_STA_CONNECTED) ? 1 : 0;
+    const int wired = lcc_node_wired_link_ok() ? 1 : 0;
+    const char *hub = lcc_node_wifi_hub_ip();
+    const int wifi_lcc = (wifi_up && lcc_node_wifi_hub_ok()) ? 1 : 0;
+    const int jmri = probe_jmri_web(wifi_up, hub);
+    apply_reach_icons(wifi_up, jmri, wired, wifi_lcc);
+    log_reach(wifi_up, jmri, wired, wifi_lcc, hub);
+}
+
 static void probe_task(void *arg)
 {
     (void)arg;
     apply_mark(0, UI_JMRI_ICON_OFF);
     apply_mark(1, UI_JMRI_ICON_OFF);
     apply_mark(2, UI_JMRI_ICON_OFF);
-
     for (;;)
     {
-        const bool wifi_up = (wifi_sta_state() == WIFI_STA_CONNECTED);
-        const bool wired = lcc_node_wired_link_ok();
-
-        bool wifi_lcc = false;
-        bool jmri = false;
-        const char *hub = lcc_node_wifi_hub_ip();
-        if (wifi_up)
-        {
-            wifi_lcc = lcc_node_wifi_hub_ok();
-            if (hub[0] && tcp_is_open(hub, CONFIG_JMRI_WEB_PORT, 1500))
-            {
-                jmri = true;
-            }
-            else if (CONFIG_JMRI_WEB_HOST[0] &&
-                     tcp_is_open(CONFIG_JMRI_WEB_HOST, CONFIG_JMRI_WEB_PORT, 1500))
-            {
-                jmri = true;
-            }
-        }
-
-        apply_mark(0, wifi_up ? (jmri ? UI_JMRI_ICON_OK : UI_JMRI_ICON_FAIL)
-                              : UI_JMRI_ICON_FAIL);
-        apply_mark(2, wired ? UI_JMRI_ICON_OK : UI_JMRI_ICON_FAIL);
-        apply_mark(1, (wired || wifi_lcc) ? UI_JMRI_ICON_OK : UI_JMRI_ICON_FAIL);
-
-        ESP_LOGI(TAG,
-                 "wifi=%s ip=%s JMRI %s:%d %s CAN %s CS105 %s:%d / Pi %s:%d => LCC %s",
-                 wifi_up ? "up" : "down",
-                 wifi_sta_ip()[0] ? wifi_sta_ip() : "-",
-                 hub[0] ? hub : (CONFIG_JMRI_WEB_HOST[0] ? CONFIG_JMRI_WEB_HOST : "(mdns)"),
-                 CONFIG_JMRI_WEB_PORT,
-                 jmri ? "up" : "down",
-                 wired ? "up" : "down",
-                 hub[0] ? hub : "(mdns)", CONFIG_LCC_WIFI_PORT,
-                 "-", CONFIG_LCC_WIFI_PORT,
-                 (wired || wifi_lcc) ? "up" : "down");
-
-        vTaskDelay(pdMS_TO_TICKS(wifi_up ? 8000 : 2000));
+        probe_once();
+        vTaskDelay(pdMS_TO_TICKS(
+            (wifi_sta_state() == WIFI_STA_CONNECTED) ? 8000 : 2000));
     }
 }
 

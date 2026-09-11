@@ -7,4 +7,7 @@ echo "== wrap tests =="
 echo "== CDI Configure =="
 clang++ -std=c++11 -I"$ROOT/tests" "$ROOT/tests/test_cdi_configure.cpp" -o /tmp/test_s3_cdi_configure
 /tmp/test_s3_cdi_configure
+echo "== SvcReachPick =="
+clang++ -std=c++11 -I"$ROOT/main/wifi" "$ROOT/tests/test_svc_reach.cpp" -o /tmp/test_s3_svc_reach
+/tmp/test_s3_svc_reach
 echo "host tests OK"

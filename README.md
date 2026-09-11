@@ -2,7 +2,7 @@
 
 An ESP32-S3–based LCC/OpenLCB turnout control panel with a touch LCD user interface for model railroad layout turnout control.
 
-**Tag `v1.0.3` (pushed).** Local **`0010c56`** (second ACDI fd + CDI host test) is **not pushed, not tagged**. Node **05.01.01.01.A5.04**. Hub is mDNS `_openlcb-can._tcp` (TCP **12021**); no static hub IPv4. JMRI web **12080** is independent of the hub. SNIP OwlThree. Last successful flash used CH343 **`/dev/ttyACM2`** `usb-1a86_USB_Single_Serial_5B8F085001-if00` (`1a86:55d3`, MAC `1c:db:d4:42:ef:d0`); native USB-JTAG `303a:1001` often **missing** (RTS). **29-Aug-2026:** LCC Pro lists this node with **Configure**. NVS kept. Wrap v2 is flash-UID + MAC. **Never flash** Mega `usb-Arduino__www.arduino.cc__0042_85036313230351A00280-if00` or RR-CirKits `usb-STMicroelectronics_STM32_Virtual_ComPort_209737A73931-if00`. Flash: hold **BOOT**, plug USB-C, keep BOOT, then `idf.py -p /dev/ttyACM2 --before no_reset flash`. CAN icon stays failed until TWAI is on the layout bus.
+**Tag `v1.0.4` (Ubuntu 10-Sep-2026).** Host wrap + CDI Configure + SvcReachPick; lizard CCN 10 on `main/wifi` and `tests/`; llvm-cov of those headers. Node **05.01.01.01.A5.04**. Hub is mDNS `_openlcb-can._tcp` (TCP **12021**); no static hub IPv4. JMRI web **12080** is independent of the hub. SNIP OwlThree. Last successful flash used CH343 **`/dev/ttyACM2`** `usb-1a86_USB_Single_Serial_5B8F085001-if00` (`1a86:55d3`, MAC `1c:db:d4:42:ef:d0`); native USB-JTAG `303a:1001` often **missing** (RTS). **29-Aug-2026:** LCC Pro lists this node with **Configure**. NVS kept. Wrap v2 is flash-UID + MAC. **Never flash** Mega `usb-Arduino__www.arduino.cc__0042_85036313230351A00280-if00` or RR-CirKits `usb-STMicroelectronics_STM32_Virtual_ComPort_209737A73931-if00`. Flash: hold **BOOT**, plug USB-C, keep BOOT, then `idf.py -p /dev/ttyACM2 --before no_reset flash`. CAN icon stays failed until TWAI is on the layout bus. No board attached this Linux session — do not flash until MAC confirm.
 
 ![ESP-IDF](https://img.shields.io/badge/ESP--IDF-v5.1.6-blue)
 ![License](https://img.shields.io/badge/license-BSD--2--Clause-green)
@@ -68,6 +68,19 @@ mounted on a surface near the layout. There is a readme in the `printed_mounts/`
 | Touch Driver | esp_lcd_touch_gt911 |
 | Image Decoder | esp_jpeg |
 
+
+## Host tests (no board)
+
+Same bar as A5.01 OpenMRN Wi-Fi and A5.03 servo: **CCN 10** on *our* code, Clang **llvm-cov** on host headers (IDF `main` is not instrumented). Ubuntu 10-Sep-2026: wrap + CDI + SvcReachPick pass; `SvcReachPick.h` 100% lines; `CdiWellFormed.h` ~94% lines.
+
+```bash
+./utils/run_host_tests.sh   # wrap + CDI Configure + SvcReachPick
+./utils/run_lizard.sh       # fail if CCN > 10 in main/wifi or tests/
+./utils/run_coverage.sh     # llvm-cov of SvcReachPick.h and CdiWellFormed.h
+# optional: LIZARD_ALL=1 ./utils/run_lizard.sh   # UI/app CCN is informational
+```
+
+OpenMRN / LVGL / `managed_components` are not scanned. Inherited panel UI (`ui_panel_builder`, JSON storage, `app_main`) still has CCN > 10; that is not the v1.0.4 fail gate.
 
 ## Building
 
