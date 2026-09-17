@@ -1,0 +1,9 @@
+# Host-only. LVGL, OpenMRN, managed_components, and panel UI are not tidied.
+# Mega-style google-runtime-int does not apply (no AVR VFS in this tree).
+Checks: 'clang-diagnostic-*,clang-analyzer-*,google-*,cert-*'
+WarningsAsErrors: 'clang-diagnostic-error,clang-analyzer-*,google-*,cert-*'
+HeaderFilterRegex: 'main/wifi/|tests/'
+FormatStyle: none
+CheckOptions:
+  - key: google-readability-braces-around-statements.ShortStatementExcept
+    value: 'false'

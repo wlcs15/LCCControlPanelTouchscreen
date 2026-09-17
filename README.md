@@ -77,6 +77,7 @@ Same bar as A5.01 OpenMRN Wi-Fi and A5.03 servo: **CCN 10** on *our* code, Clang
 ./utils/run_host_tests.sh   # wrap + CDI Configure + SvcReachPick
 ./utils/run_lizard.sh       # fail if CCN > 10 in main/wifi or tests/
 ./utils/run_coverage.sh     # llvm-cov of SvcReachPick.h and CdiWellFormed.h
+./utils/run_clang_tidy.sh   # host fail gate (python core; .ps1 on Win11)
 # optional: LIZARD_ALL=1 ./utils/run_lizard.sh   # UI/app CCN is informational
 ```
 
@@ -86,6 +87,7 @@ Windows 11 (PowerShell; same gates, Clang llvm-cov, no house PSK):
 powershell -NoProfile -ExecutionPolicy Bypass -File utils\run_host_tests.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File utils\run_lizard.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File utils\run_coverage.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File utils\run_clang_tidy.ps1
 # optional: $env:LIZARD_ALL=1; .\utils\run_lizard.ps1
 ```
 

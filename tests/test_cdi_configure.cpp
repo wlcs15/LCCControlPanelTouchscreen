@@ -29,17 +29,20 @@ int main(void)
     static const char truncated[] =
         "<?xml version=\"1.0\"?><cdi><identification>";
 
-    expect_eq(s3_cdi_configure_ready(cdi, (unsigned)strlen(cdi)), 1,
+    expect_eq(s3_cdi_configure_ready(cdi, static_cast<unsigned>(strlen(cdi))), 1,
               "A5.04 full CDI");
-    expect_eq(s3_cdi_configure_ready(truncated, (unsigned)strlen(truncated)), 0,
-              "truncated hides Configure");
+    expect_eq(s3_cdi_configure_ready(
+                  truncated, static_cast<unsigned>(strlen(truncated))),
+              0, "truncated hides Configure");
     expect_eq(s3_cdi_configure_ready(0, 32), 0, "null xml");
     expect_eq(s3_cdi_configure_ready("short", 5), 0, "too short");
-    expect_eq(s3_cdi_has(cdi, (unsigned)strlen(cdi), 0), 0, "null needle");
-    expect_eq(s3_cdi_has(cdi, (unsigned)strlen(cdi), ""), 0, "empty needle");
+    expect_eq(s3_cdi_has(cdi, static_cast<unsigned>(strlen(cdi)), 0), 0,
+              "null needle");
+    expect_eq(s3_cdi_has(cdi, static_cast<unsigned>(strlen(cdi)), ""), 0,
+              "empty needle");
     static const char noman[] = "<?xml version=\"1.0\"?><cdi></cdi>";
-    expect_eq(s3_cdi_configure_ready(noman, (unsigned)strlen(noman)), 0,
-              "no manufacturer");
+    expect_eq(s3_cdi_configure_ready(noman, static_cast<unsigned>(strlen(noman))),
+              0, "no manufacturer");
 
     if (g_fail)
     {
