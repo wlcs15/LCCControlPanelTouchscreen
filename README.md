@@ -185,7 +185,17 @@ The `sdcard/` directory in this repository contains template files that you can 
 1. Format your SD card as FAT32
 2. Copy all files from the `sdcard/` folder to the root of your SD card
 3. Copy `nodeid.txt`, `turnouts.json`, `panel.json`, and `roster.xml` from `sdcard/`
-4. This tree’s examples use OwlThree **`05.01.01.01.A5.04`** (S3 panel). Do not reuse `.A5.01` (D1 R32 display), `.A5.02` (Mega), or `.A5.03` (D1 R32 servo).
+4. This tree’s examples use OwlThree **`05.01.01.01.A5.04`** (S3 panel). The id is `LCC_DEFAULT_NODE_ID`, or `nodeid.txt` on the SD card when that file is present. Do not reuse `.A5.01` (D1 R32 display), `.A5.02` (Mega), or `.A5.03` (D1 R32 servo).
+
+| Node | Hardware | Where the full firmware lives | Tag |
+| --- | --- | --- | --- |
+| A5.01 | Wemos D1 R32, Wi-Fi | Wemos display repo, `fix-bugs-cls-Wemos-ESP32-and-Waveshare_4inch_touch_display` | `v1.0.4` |
+| A5.02 | Mega, wired CAN | Servo repo, Mega build | existing Mega tag |
+| A5.03 | Wemos D1 R32, servo Wi-Fi | Servo repo, `wemos-d1r32` | not the CAN-shield test branches |
+| A5.04 | ESP32-S3 4.3 inch panel | this repo, `cls_waveshare_ESP32-S3_4.3Inch_WiFi` | `v1.0.5` |
+| A5.05 | Pico 2 W, Wi-Fi | Pico repo, `main` | `v0.05` |
+| A5.06 | Pico W + 3.5 inch panel | Pico repo, `pico-w-restouch-3.5` | none yet |
+| A5.07 | RP2350-CAN | Pico repo, `RP2350-Transmit-Test` | `v1.05` is the CAN bring-up, not a retag of the node |
 
 ### File Reference
 
