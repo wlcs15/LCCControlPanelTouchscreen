@@ -1,0 +1,79 @@
+Required tools — ESP-IDF OpenMRN / LCC firmware (ESP32-S3 (Waveshare 4.3 Inch LCC Control Panel))
+================================================================
+
+Nothing in scripts/check_tools.sh or check_tools.ps1 installs a tool.
+They only report presence. They never flash hardware and never read a Wi-Fi PSK.
+
+Target chip / QEMU machine: esp32s3
+v5.1.6 preferred (match GrokBot-CI-Espressif / utils/build_idf5.sh)
+
+
+Host build tools (required)
+---------------------------
+  git                          clone + submodule update --init --recursive
+  Python 3                     idf.py, utils/*.py, host tests
+  CMake 3.16+                  ESP-IDF / idf.py configure
+  Ninja (or GNU make)          ESP-IDF default generator
+
+
+ESP-IDF toolchain (required to build / flash)
+---------------------------------------------
+  ESP-IDF v5.1.6 preferred (match GrokBot-CI-Espressif / utils/build_idf5.sh)
+  idf.py on PATH after export:
+    Linux GrokBot workspace:
+      source /workspace/env/esp-idf-v5.1.6.sh
+    Local Linux:
+      export IDF_PATH=~/esp/esp-idf-v5.1.6
+      . "$IDF_PATH/export.sh"
+    Windows:
+      run ESP-IDF PowerShell / CMD export after installing the Espressif IDE
+      or the ESP-IDF Windows installer.
+
+  Repo helpers (when present):
+    utils/build_idf5.sh        password-free / provisioned IDF build wrapper
+    utils/run_host_tests.sh    host Unity / clang test runner
+
+
+Optional (WARN only)
+--------------------
+  LLVM Clang                   host tidy / coverage (not required for idf.py build)
+
+
+Emulator (Espressif QEMU CI smoke; optional for local build)
+------------------------------------------------------------
+  qemu-system-xtensa           Linux only. GrokBot-CI-Espressif smoke-runs a
+                               merged flash image:
+                                 qemu-system-xtensa -nographic -machine esp32s3 \
+                                   -drive file=<flash.bin>,if=mtd,format=raw
+                               Workspace helper (GrokBot box):
+                                 /workspace/tools/ci/run_qemu_esp.sh esp32s3 <flash.bin>
+                               Presence check only in scripts/check_tools.sh
+                               (WARN if missing — does NOT fail a local build).
+                               Windows check_tools.ps1 reports SKIP (not expected
+                               on a typical Win PATH; Linux CI only).
+                               Timeout exit 124 is a clean smoke PASS in CI.
+                               Does NOT require Renode, simavr, or ARM qemu.
+
+
+Typical install (Ubuntu)
+------------------------
+  sudo apt install git python3 cmake ninja-build
+  # ESP-IDF v5.1.6 preferred (match GrokBot-CI-Espressif / utils/build_idf5.sh): follow https://docs.espressif.com/projects/esp-idf/
+  # Optional host quality: sudo apt install clang
+  # Espressif QEMU is provided on the GrokBot workspace under /workspace/tools/qemu-esp;
+  # local developers may skip it unless running CI smoke.
+
+
+Typical install (Windows 11)
+----------------------------
+  Git for Windows, Python 3, CMake, Ninja
+  ESP-IDF v5.1.6 preferred (match GrokBot-CI-Espressif / utils/build_idf5.sh) via Espressif Windows installer / VS Code Espressif extension
+  qemu-system-xtensa is NOT expected on Windows (Linux CI only)
+
+
+How to run the check
+--------------------
+  Linux:   ./scripts/check_tools.sh
+  Windows: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check_tools.ps1
+
+  Sample Linux capture on the GrokBot box: docs/check_tools-sample-linux.txt

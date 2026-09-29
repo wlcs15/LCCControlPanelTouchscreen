@@ -1,0 +1,25 @@
+Required tools check (Linux / ESP-IDF)  repo: /workspace/builds/pr-work/LCCControlPanelTouchscreen
+Target: ESP32-S3 (Waveshare 4.3 Inch LCC Control Panel)  (QEMU machine: esp32s3)
+
+=== Host build tools (required) ===
+  OK       git                    git version 2.47.3
+  OK       python                 Python 3.13.5 (python3)
+  OK       cmake                  cmake version 4.4.3
+  OK       ninja                  1.13.1
+
+=== ESP-IDF toolchain (required to build firmware) ===
+  OK       idf.py                 ESP-IDF v5.1.6 (/workspace/tools/esp-idf-v5.1.6/tools/idf.py)
+  OK       IDF_PATH               /workspace/tools/esp-idf-v5.1.6
+
+=== Repo helpers (expected in this tree) ===
+  OK       build_idf5.sh          utils/build_idf5.sh
+  OK       run_host_tests.sh      utils/run_host_tests.sh
+
+=== Optional host quality (WARN only) ===
+  OK       clang                  clang version 19.1.7 (/home/runner/work/llvm-project/llvm-project/clang cd708029e0b2869e80abe31ddb175f7c35361f90)
+
+=== Emulator (Espressif QEMU CI smoke) ===
+  OK       qemu-system-xtensa     /workspace/tools/bin/qemu-system-xtensa  (-machine esp32s3 CI smoke)
+
+All required and optional tools found.
+Details: docs/REQUIRED_TOOLS.txt
