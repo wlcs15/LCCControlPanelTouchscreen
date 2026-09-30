@@ -41,19 +41,25 @@ Optional (WARN only)
 
 Emulator (Espressif QEMU CI smoke; optional for local build)
 ------------------------------------------------------------
-  qemu-system-xtensa           Linux only. GrokBot-CI-Espressif smoke-runs a
-                               merged flash image:
+  qemu-system-xtensa           Linux only. On-target smoke:
+                                 ./utils/run_host_tests_qemu.sh --build
+                               That builds into build_qemu/ with
+                               sdkconfig.defaults.qemu (Quad PSRAM @ 40MHz, DIO)
+                               and runs:
                                  qemu-system-xtensa -nographic -machine esp32s3 \
+                                   -m 8M \
                                    -drive file=<flash.bin>,if=mtd,format=raw
+                               (-m enables PSRAM emulation; product Octal@120MHz
+                               QIO firmware panics under QEMU — do not reuse build/)
+                               Merge fill size must match the image header (16MB).
                                Workspace helper (GrokBot box):
                                  /workspace/tools/ci/run_qemu_esp.sh esp32s3 <flash.bin>
                                Presence check only in scripts/check_tools.sh
                                (WARN if missing — does NOT fail a local build).
                                Windows check_tools.ps1 reports SKIP (not expected
                                on a typical Win PATH; Linux CI only).
-                               Timeout exit 124 is a clean smoke PASS in CI.
+                               Timeout exit 124 with boot evidence is a clean PASS.
                                Does NOT require Renode, simavr, or ARM qemu.
-
 
 Typical install (Ubuntu)
 ------------------------

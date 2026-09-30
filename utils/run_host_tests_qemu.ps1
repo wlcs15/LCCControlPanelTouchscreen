@@ -1,11 +1,12 @@
 # On-target Espressif QEMU firmware smoke (esp32s3 / LCC Control Panel).
 # Same as utils/run_host_tests_qemu.py / .sh.
 #
-#   powershell -NoProfile -ExecutionPolicy Bypass -File utils\run_host_tests_qemu.ps1
 #   powershell ... -File utils\run_host_tests_qemu.ps1 --build
+#   powershell ... -File utils\run_host_tests_qemu.ps1 --flash build_qemu\qemu_flash.bin
 #
 # Native host unit tests: utils\run_host_tests.ps1 (not QEMU).
 # Espressif qemu-system-xtensa is typically Linux CI; clear error if missing.
+# --build uses sdkconfig.defaults.qemu into build_qemu/ (see run_host_tests_qemu.py).
 $ErrorActionPreference = "Stop"
 $Root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location $Root

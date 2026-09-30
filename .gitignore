@@ -91,3 +91,6 @@ sdcard-backups/
 wifi_secrets.env
 local/
 main/wifi/wifi_psk_wrap.inc
+
+# QEMU harness build (utils/run_host_tests_qemu.py --build)
+build_qemu/
