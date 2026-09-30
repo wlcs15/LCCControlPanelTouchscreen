@@ -2,12 +2,12 @@
 # On-target Espressif QEMU firmware smoke (esp32s3 / LCC Control Panel).
 # Launcher for utils/run_host_tests_qemu.py — same behavior as .ps1.
 #
-#   ./utils/run_host_tests_qemu.sh
 #   ./utils/run_host_tests_qemu.sh --build
-#   ./utils/run_host_tests_qemu.sh --flash build/qemu_flash.bin
+#   ./utils/run_host_tests_qemu.sh --flash build_qemu/qemu_flash.bin
 #
 # Native host unit tests: utils/run_host_tests.sh (Linux clang++; not QEMU).
-# Does not flash hardware. Prefers Espressif qemu-system-xtensa (-machine esp32s3).
+# Does not flash hardware. Prefers Espressif qemu-system-xtensa (-machine esp32s3 -m 8M).
+# --build uses sdkconfig.defaults.qemu into build_qemu/ (product Octal@120MHz panics in QEMU).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC1091

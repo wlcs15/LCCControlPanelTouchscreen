@@ -1,18 +1,25 @@
 #!/usr/bin/env python3
 """On-target Espressif QEMU firmware smoke for ESP32-S3 (LCC Control Panel).
 
-Matches the GrokBot-CI-Espressif EMULATOR gate: merge an IDF flash image and
-boot it under qemu-system-xtensa -machine esp32s3. Does NOT flash hardware.
+Matches the GrokBot-CI-Espressif EMULATOR gate: build (or reuse) a QEMU-friendly
+IDF flash image and boot it under qemu-system-xtensa -machine esp32s3.
+Does NOT flash hardware.
 
-Native Linux host unit tests (clang++ / wrap selftests) stay in
-utils/run_host_tests.sh — those binaries are host-native and are not wrapped
-into QEMU here.
+Product firmware (sdkconfig.defaults) uses Octal PSRAM @ 120MHz QIO for the
+Waveshare board. That combination panics under Espressif QEMU (missing PSRAM
+without -m / is_octal, then BBPLL MSPI tuning asserts). This harness therefore:
 
-Usage (from repo root, after an IDF build or with --build):
-  python -u utils/run_host_tests_qemu.py
+  * builds into build_qemu/ with sdkconfig.defaults + sdkconfig.defaults.qemu
+    (Quad PSRAM @ 40MHz, DIO flash, HPM off)
+  * passes -m 8M so QEMU emulates PSRAM (Quad; do not pass is_octal)
+  * merges with --fill-flash-size matching the image header (16MB)
+
+Native Linux host unit tests stay in utils/run_host_tests.sh.
+
+Usage (from repo root):
   python -u utils/run_host_tests_qemu.py --build
-  python -u utils/run_host_tests_qemu.py --flash build/qemu_flash.bin
-  TIMEOUT_SEC=30 python -u utils/run_host_tests_qemu.py
+  python -u utils/run_host_tests_qemu.py --flash build_qemu/qemu_flash.bin
+  TIMEOUT_SEC=30 python -u utils/run_host_tests_qemu.py --build
 
 Discover QEMU via QEMU_ESP / ESPRESSIF_QEMU / QEMU_SYSTEM_XTENSA, PATH, or
 /workspace/tools (source /workspace/env/emulators.sh when present).
@@ -32,14 +39,17 @@ import time
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 MACHINE = "esp32s3"
 TARGET_LABEL = "ESP32-S3 (Waveshare 4.3 Inch LCC Control Panel)"
-DEFAULT_FLASH = os.path.join(ROOT, "build", "qemu_flash.bin")
+BUILD_DIR = os.path.join(ROOT, "build_qemu")
+DEFAULT_FLASH = os.path.join(BUILD_DIR, "qemu_flash.bin")
+SDKCONFIG_DEFAULTS_QEMU = "sdkconfig.defaults;sdkconfig.defaults.qemu"
+PSRAM_MB = "8M"  # qemu -m; Quad PSRAM (see sdkconfig.defaults.qemu)
 DEFAULT_TIMEOUT = 25
 BOOT_OK = re.compile(
     r"esp_image|boot:|I \(|app_main|hello_world|cpu_start|Loaded app",
     re.I,
 )
 BOOT_PANIC = re.compile(
-    r"Guru Meditation|panic|LoadProhibited|abort\(\)|StoreProhibited|IllegalInstruction",
+    r"Guru Meditation|panic|LoadProhibited|abort\(\)|StoreProhibited|IllegalInstruction|assert failed|Failed to init external RAM",
     re.I,
 )
 
@@ -133,6 +143,21 @@ def find_esptool():
     return None
 
 
+def flash_fill_size(fa):
+    """Pick merge --fill-flash-size from flasher_args (must match image header)."""
+    settings = fa.get("flash_settings") or {}
+    size = settings.get("flash_size") or ""
+    if not size:
+        for arg in fa.get("write_flash_args") or []:
+            if isinstance(arg, str) and arg.endswith("MB") and arg[0].isdigit():
+                size = arg
+                break
+    if size in ("2MB", "4MB", "8MB", "16MB"):
+        return size
+    # Waveshare 4.3B product default; QEMU overlay keeps 16MB
+    return "16MB"
+
+
 def merge_flash(build_dir, out_path):
     fa_path = os.path.join(build_dir, "flasher_args.json")
     if not os.path.isfile(fa_path):
@@ -152,43 +177,95 @@ def merge_flash(build_dir, out_path):
             return 2
         pairs.extend([off, full])
     chip = (fa.get("extra_esptool_args") or {}).get("chip") or MACHINE
+    fill = flash_fill_size(fa)
     esptool = find_esptool()
     if not esptool:
         eprint("EMU_QEMU_ESP esptool.py not on PATH (source ESP-IDF export /workspace/env/esp-idf-v5.1.6.sh)")
         return 2
-    cmd = [esptool, "--chip", chip, "merge_bin", "-o", out_path, "--fill-flash-size", "4MB"] + pairs
+    cmd = [esptool, "--chip", chip, "merge_bin", "-o", out_path, "--fill-flash-size", fill] + pairs
     print("RUN:", " ".join(cmd), flush=True)
     return subprocess.call(cmd)
 
 
 def maybe_build():
+    """Build a QEMU-friendly image into build_qemu/ (does not replace product build/)."""
+    overlay = os.path.join(ROOT, "sdkconfig.defaults.qemu")
+    if not os.path.isfile(overlay):
+        eprint("EMU_QEMU_ESP missing sdkconfig.defaults.qemu (QEMU PSRAM/flash overlay)")
+        return 2
     build_sh = os.path.join(ROOT, "utils", "build_idf5.sh")
     if not os.path.isfile(build_sh):
         eprint("EMU_QEMU_ESP missing utils/build_idf5.sh")
         return 2
-    # Ensure IDF_PATH from workspace helper if unset
     if not os.environ.get("IDF_PATH") and os.path.isdir("/workspace/tools/esp-idf-v5.1.6"):
         os.environ["IDF_PATH"] = "/workspace/tools/esp-idf-v5.1.6"
     env = os.environ.copy()
-    print("=== build (set-target %s + build) ===" % MACHINE, flush=True)
-    rc = subprocess.call(["bash", build_sh, "set-target", MACHINE], cwd=ROOT, env=env)
-    if rc != 0:
-        return rc
-    return subprocess.call(["bash", build_sh, "build"], cwd=ROOT, env=env)
+    # Force QEMU defaults even if a prior product sdkconfig exists in-tree.
+    env["SDKCONFIG_DEFAULTS"] = SDKCONFIG_DEFAULTS_QEMU
+    # Isolated build dir so hardware sdkconfig/build/ stay untouched.
+    os.makedirs(BUILD_DIR, exist_ok=True)
+    # Drop stale qemu sdkconfig so defaults+overlay are reapplied cleanly.
+    for stale in ("sdkconfig", "sdkconfig.old"):
+        p = os.path.join(BUILD_DIR, stale)
+        if os.path.isfile(p):
+            os.remove(p)
+    # Also clear root sdkconfig if present — idf.py set-target writes here first.
+    root_sdk = os.path.join(ROOT, "sdkconfig")
+    root_sdk_bak = os.path.join(ROOT, "sdkconfig.qemu_harness.bak")
+    restored = False
+    if os.path.isfile(root_sdk):
+        os.replace(root_sdk, root_sdk_bak)
+        restored = True
+    print(
+        "=== build_qemu (set-target %s + QEMU overlay + build) ===" % MACHINE,
+        flush=True,
+    )
+    try:
+        # idf.py -B build_qemu respects SDKCONFIG_DEFAULTS from env / -D
+        rc = subprocess.call(
+            [
+                "bash",
+                build_sh,
+                "-B",
+                BUILD_DIR,
+                "-D",
+                "SDKCONFIG_DEFAULTS=%s" % SDKCONFIG_DEFAULTS_QEMU,
+                "set-target",
+                MACHINE,
+            ],
+            cwd=ROOT,
+            env=env,
+        )
+        if rc != 0:
+            return rc
+        return subprocess.call(
+            ["bash", build_sh, "-B", BUILD_DIR, "build"],
+            cwd=ROOT,
+            env=env,
+        )
+    finally:
+        if restored and os.path.isfile(root_sdk_bak):
+            # Leave product root sdkconfig as it was (do not keep qemu overlay).
+            if os.path.isfile(root_sdk):
+                os.remove(root_sdk)
+            os.replace(root_sdk_bak, root_sdk)
 
 
 def ensure_flash(flash_path, do_build):
     if flash_path and os.path.isfile(flash_path):
         return flash_path, 0
-    build_dir = os.path.join(ROOT, "build")
+    build_dir = BUILD_DIR
     default_out = DEFAULT_FLASH
     if os.path.isfile(default_out) and (not flash_path or flash_path == default_out):
         return default_out, 0
-    if do_build or not os.path.isfile(os.path.join(build_dir, "flasher_args.json")):
+    fa = os.path.join(build_dir, "flasher_args.json")
+    if do_build or not os.path.isfile(fa):
         if not do_build:
             eprint(
-                "EMU_QEMU_ESP no flash image at %s and no build/flasher_args.json; "
-                "pass --build or build first (./utils/build_idf5.sh build)" % default_out
+                "EMU_QEMU_ESP no QEMU flash at %s (and no %s). "
+                "Pass --build to compile with sdkconfig.defaults.qemu into build_qemu/, "
+                "or --flash <merged.bin>. Product build/ images use Octal@120MHz and panic under QEMU."
+                % (default_out, fa)
             )
             return None, 2
         rc = maybe_build()
@@ -196,7 +273,7 @@ def ensure_flash(flash_path, do_build):
             eprint("EMU_QEMU_ESP build failed exit=%s" % rc)
             return None, rc
     out = flash_path or default_out
-    os.makedirs(os.path.dirname(out), exist_ok=True)
+    os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     rc = merge_flash(build_dir, out)
     if rc != 0:
         return None, rc
@@ -204,11 +281,16 @@ def ensure_flash(flash_path, do_build):
 
 
 def run_qemu(qemu_bin, flash_path, timeout_sec, log_path):
+    prepare_qemu_env()
+    # -m enables PSRAM emulation (Quad by default). Product overlay uses QUAD;
+    # do not pass ssi_psram is_octal here.
     cmd = [
         qemu_bin,
         "-nographic",
         "-machine",
         MACHINE,
+        "-m",
+        PSRAM_MB,
         "-drive",
         "file=%s,if=mtd,format=raw" % flash_path,
     ]
@@ -284,12 +366,12 @@ def main(argv=None):
     parser.add_argument(
         "--build",
         action="store_true",
-        help="Run utils/build_idf5.sh set-target/build before merge if needed",
+        help="Build into build_qemu/ with sdkconfig.defaults.qemu before merge",
     )
     parser.add_argument(
         "--flash",
         default=os.environ.get("FLASH", ""),
-        help="Path to merged raw flash image (default: build/qemu_flash.bin)",
+        help="Path to merged raw flash image (default: build_qemu/qemu_flash.bin)",
     )
     parser.add_argument(
         "--timeout",
